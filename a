@@ -1,1 +1,2 @@
-a=['onabort']
+a=['abort','error','keydown','load','loadend','message','mousedown','mousemove','online','open','success','touchmove','touchstart','upgradeneeded','versionchange'],
+a=a.map(b=>'on'+b),b=a.length
