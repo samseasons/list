@@ -1,0 +1,9 @@
+:root {
+  --a: gray;
+  --b: black;
+  --c: white;
+}
+body {
+  background-color: var(--b);
+  color: var(--a);
+}
