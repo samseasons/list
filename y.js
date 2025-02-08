@@ -1,3 +1,4 @@
+function choo(){
 a=['abort','error','keydown','load','loadend','message','mousedown','mousemove','online','open','success','touchmove','touchstart','upgradeneeded','versionchange']
 a=a.map(b=>'on'+b),b=a.length
 function c(z,y){x=z.attributes,w=y.attributes;for(v=x.length;v--;){u=x[v],t=u.name,s=u.namespaceURI,r=u.value;if(s){t=u.localName||t,q=y.getAttributeNS(s,t);if(q!=r)y.setAttributeNS(s,t,r)}else{if(!y.hasAttribute(t)){y.setAttribute(t,r)}else{q=y.getAttribute(t);if(q!=r){if(r==''){y.removeAttribute(t)}else{y.setAttribute(t,r)}}}}}for(v=w.length;v--;){u=w[v];if(u.specified){t=u.name,s=u.namespaceURI;if(s){t=u.localName||t;if(!z.hasAttributeNS(s,t)){y.removeAttributeNS(s,t)}}else if(!z.hasAttributeNS('',t)){y.removeAttribute(t)}}}}
@@ -11,4 +12,5 @@ function j(z,y){let s,t,u,v,w=0,x=0;for(w;;w++){v=z.childNodes[w-x],u=y.childNod
 function k(z,y){if(!y){return z}else if(!z){return}else if(z==y){return y}else if(z.tagName!=y.tagName){return z}else{h(z,y),j(z,y);return y}}
 function l(z,y){return z.hasOwnProperty(y)}
 function m(){this.z={y:{}}}m.prototype.a=function(z){return z.replace(/^\//,'').split('/')};m.prototype.b=function(z){y=this.a(z);function n(x,w){v=(l(y,x)&&y[x]);if(!v){return w}u={};if(/^:|^\*/.test(v)){if(!l(w.y,'w')){u={y:{}},w.y.w=u}else{u=w.y.w}if(v[0]=='*'){w.x=true}w.w=v.replace(/^:|^\*/,'')}else if(!l(w.y,v)){u={y:{}},w.y[v]=u}else{u=w.y[v]}return n(x+1,u)}return n(0,this.z)};m.prototype.c=function(z){y=this.a(z),v={};function n(x,w){if(!w){return}u=y[x];if(!u){return w}if(l(w.y,u)){return n(x+1,w.y[u])}else if(w.w){try{v[w.w]=decodeURIComponent(u)}catch{return n(x)}return n(x+1,w.y.w)}else if(w.x){try{v.x=decodeURIComponent(y.slice(x).join('/'))}catch{return n(x)}return w.y.w}else{return n(x+1)}}t=n(0,this.z);if(!t){return}t.v=v;return t}
-function n(z){z=(z||'').replace(/^\//,''),m=new m(),o={};function p(y,x){y=y||'/',w=m.b(y),w.x=x,w.y=y}function q(y){y=m.c(y);if(y&&y.x){return new r(y)}x=m.c(z);if(x&&x.x){return new r(x)}}function r(y){this.x=y.x,this.y=y.y,this.z=y.v}o.p=p,o.q=q;return o}
+function n(z){z=(z||'').replace(/^\//,''),m=new m(),o={};function p(y,x){y=y||'/',w=m.b(y),w.x=x,w.y=y}function q(y){y=m.c(y);if(y&&y.x){return new r(y)}x=m.c(z);if(x&&x.x){return new r(x)}}function r(y){this.w=y.v,this.x=y.x,this.y=y.y}o.p=p,o.q=q;return o}
+}
