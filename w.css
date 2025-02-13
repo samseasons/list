@@ -6,4 +6,5 @@
 body {
   background-color: var(--b);
   color: var(--a);
+  height: 100%;
 }
