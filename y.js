@@ -12,4 +12,14 @@ function j(z,y){let s,t,u,v,w=0,x=0;for(w;;w++){v=z.childNodes[w-x],u=y.childNod
 function k(z,y){if(!y){return z}else if(!z){return}else if(z==y){return y}else if(z.tagName!=y.tagName){return z}else{h(z,y),j(z,y);return y}}
 function l(){z={},this.a=function(y,x){z.y=y,z.x=x};function m(y){this.a=y.v,this.b=y.x,this.c=y.y};this.b=function(){return new m(z)}}
 function m(){this.z={},this.a=function(z){y=[],x=arguments,w=x.length;for(v=1;v<w;v++){y.push(x[v])}z=this.z[z];if(z){x=z.length;for(w=0;w<x;w++){v=z[w],v.apply(v,y)}}return this};this.b=function(z,y){if(!this.z[z]){this.z[z]=[]}this.z[z].unshift(y);return this};this.c=function(z,y){if(!this.z[z]){this.z[z]=[]}this.z[z].push(y);return this}}
+function n(z){if(!z){return}if(z.localName!='a'){return n(z.parentNode)}return z}
+function o(z){if(z.altKey||z.button||z.ctrlKey||z.metaKey||z.shiftKey){z.preventDefault()}y=n(z.target);if(!y){return}z.preventDefault();return y}
+function p(z){document.onclick=function(y){y.preventDefault()},document.onmousedown=function(y){z(o(y))},document.ontouchstart=function(y){z(o(y))}}
+this.a=new l(),this.b=new m(),this.c=this.b.a.bind(this.b),this.d=[],this.e={},this.f='',this.g=function(z){return this.a.b().b(z,this.c)}
+this.use=function(z){y=this,y.d.push(function(x){z(x,y.b)})}
+this.load=function(z){y=this,y.d.push(function(x){z(x,y.c)})}
+this.route=function(z,y){this.a.a(z,y)}
+this.mount=function(z){function l(y,x){if(x&&x!=y.f){k(y.g(y.e),y.h),y.c('pushState')}else{y.c('render')}y.f=document.location.href}m=this,p(function(y){if(y){y=y.href,history.replaceState({},'',y),l(m,y)}}),this.d.forEach(function(y){y(m.e)}),m.h=document.getElementById(z),k(m.g(m.e),m.h)}
+}
+function html(){
 }
