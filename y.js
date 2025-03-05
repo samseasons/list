@@ -21,5 +21,5 @@ this.load=function(z){y=this,y.d.push(function(x){z(x,y.c)})}
 this.route=function(z,y){this.a.a(z,y)}
 this.mount=function(z){m=this,p(function(y){if(y&&y.href){history.pushState({},'',y.href),k(m.f(m.e),m.g)}}),m.d.forEach(y=>y(m.e)),m.g=document.getElementById(z),k(m.f(m.e),m.g)}
 }
-function html(){
+function html(a){
 }
