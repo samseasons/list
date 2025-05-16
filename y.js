@@ -1,5 +1,5 @@
 function choo () {
-  const events = ['abort', 'click', 'error', 'keydown', 'load', 'loadend', 'message', 'mousedown', 'mousemove',
+  const s = '', events = ['abort', 'click', 'error', 'keydown', 'load', 'loadend', 'message', 'mousedown', 'mousemove',
     'online', 'open', 'popstate', 'success', 'touchmove', 'upgradeneeded', 'versionchange'].map(event => 'on' + event)
 
   function remove_attribute (node, name) {
@@ -13,7 +13,7 @@ function choo () {
   function morph_attribute (new_node, old_node, name) {
     if (new_node[name] != old_node[name]) {
       old_node[name] = new_node[name]
-      new_node[name] ? set_attribute(old_node, name, '') : remove_attribute(old_node, name)
+      new_node[name] ? set_attribute(old_node, name, s) : remove_attribute(old_node, name)
     }
   }
 
@@ -26,7 +26,7 @@ function choo () {
     morph_attribute(new_node, old_node, 'checked')
     morph_attribute(new_node, old_node, 'disabled')
     if (new_value != old_value || old_node.type == 'range') set_attribute(old_node, value, new_value)
-    if (new_value == '' || !has_attribute_ns(new_node, '', value)) remove_attribute(old_node, value)
+    if (new_value == s || !has_attribute_ns(new_node, s, value)) remove_attribute(old_node, value)
   }
 
   function replace_attributes (new_node, old_node) {
@@ -42,7 +42,7 @@ function choo () {
       } else {
         if (old_node.hasAttribute(name)) {
           if (old_node.getAttribute(name) != value) {
-            value == '' ? remove_attribute(old_node, name) : set_attribute(old_node, name, value)
+            value == s ? remove_attribute(old_node, name) : set_attribute(old_node, name, value)
           }
         } else {
           set_attribute(old_node, name, value)
@@ -57,7 +57,7 @@ function choo () {
         if (namespace) {
           name = attr.localName || name
           !has_attribute_ns(new_node, namespace, name) && old_node.removeAttributeNS(namespace, name)
-        } else if (!has_attribute_ns(new_node, '', name)) {
+        } else if (!has_attribute_ns(new_node, s, name)) {
           remove_attribute(old_node, name)
         }
       }
@@ -69,8 +69,8 @@ function choo () {
     if (new_value != old_node.value) {
       old_node.value = new_value
       child = old_node.firstChild
-      if (child && child.nodeValue != new_value && !(new_value == '' && child.nodeValue == old_node.placeholder)) {
-        old_node.firstChild.nodeValue = new_value
+      if (child && child.nodeValue != new_value && !(new_value == s && child.nodeValue == old_node.placeholder)) {
+        child.nodeValue = new_value
       }
     }
   }
@@ -89,7 +89,7 @@ function choo () {
     } else if (new_name == 'TEXTAREA') {
       morph_textarea(new_node, old_node)
     }
-    events.forEach(event => old_node[event] = new_node[event] ? new_node[event] : '')
+    events.forEach(event => old_node[event] = new_node[event] ? new_node[event] : s)
   }
 
   function same (a, b) {
@@ -116,7 +116,7 @@ function choo () {
           offset++
         }
       } else {
-        match = ''
+        match = s
         length = old_node.a.length
         for (j = i; j < length; j++) {
           if (same(old_node.a[j], new_child)) {
@@ -220,12 +220,12 @@ function choo () {
   }
 
   this.mount = function (node) {
-    let self = this
+    const self = this
     window.onpopstate = event => walk(self)
     ready(state => {
       state = state && state.href
       if (state) {
-        history.pushState({}, '', state)
+        history.pushState({}, s, state)
         walk(self)
       }
     })
@@ -235,20 +235,18 @@ function choo () {
   }
 }
 
-function html () {
-  const options = {}
-  const var_attr = 0, text_attr = 1, open_attr = 2, close_attr = 3, attr = 4, attr_key = 5, attr_key_w = 6
-  const attr_value_w = 7, attr_value = 8, attr_sq = 9, attr_dq = 10, attr_eq = 11, attr_break = 12, comment = 13
-  const trail_line = /\n[\s]+$/, lead_line = /^\n[\s]+/, trail_space = /[\s]+$/, lead_space = /^[\s]+/
-  const multi_space = /[\n\s]+/g, xmlns = /^xmlns($|:)/i, end_hyphen = /-$/, start_comment = /^!--$/
-  const whitespace = /\s/, not_whitespace = /[^\s"'=/]/, whitespace_only = /^\s*$/, word_or_hyphen = /[\w-]/
-  const single_char_only = /\S/, forward_slash = /^\//
-  const comment_tag = '!--'
+function html (options={}) {
+  const var_attr = 0, text_attr = 1, open_attr = 2, close_attr = 3, attr = 4, attr_key = 5, attr_key_w = 6,
+    attr_value_w = 7, attr_value = 8, attr_sq = 9, attr_dq = 10, attr_eq = 11, attr_break = 12, comment = 13,
+    end_hyphen = /-$/, forward_slash = /^\//, lead_line = /^\n[\s]+/, lead_space = /^[\s]+/,
+    multi_space = /[\n\s]+/g, not_whitespace = /[^\s"'=/]/, single_char_only = /\S/, start_comment = /^!--$/,
+    trail_line = /\n[\s]+$/, trail_space = /[\s]+$/, whitespace = /\s/,  whitespace_only = /^\s*$/,
+    word_or_hyphen = /[\w-]/, xmlns = /^xmlns($|:)/i, comment_tag = '!--', string = 'string', s = '', p = ' ',
+    func = 'function', obj = 'object', slash = '/', style = 'style', sstyle = '/style', eq = '=', dq = '"', sq = "'"
   const bool_props = ['autofocus', 'checked', 'defaultchecked', 'disabled', 'formnovalidate', 'indeterminate',
-    'readonly', 'required', 'selected', 'willvalidate']
-  const code_tags = ['code', 'pre']
-  const text_tags = ['a', 'abbr', 'b', 'bdi', 'bdo', 'br', 'cite', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rp',
-    'rt', 'rtc', 'ruby', 's', 'amp', 'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr']
+    'readonly', 'required', 'selected', 'willvalidate'], code_tags = ['code', 'pre'], text_tags = ['a', 'abbr', 'b',
+    'bdi', 'bdo', 'br', 'cite', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rp', 'rt', 'rtc', 'ruby', 's', 'amp',
+    'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr']
   const void_closes = RegExp('^(' + ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen',
     'link', 'meta', 'param', 'source', 'track', 'wbr'].join('|') + ')(?:[\.#][a-zA-Z0-9\u007F-\uFFFF_:-]+)*$')
 
@@ -288,6 +286,14 @@ function html () {
     return node.replace(regex, value)
   }
 
+  function set_ns (el, attr, prop, value) {
+    el.setAttributeNS(attr, prop, value)
+  }
+
+  function test (regex, string) {
+    return regex.test(string)
+  }
+
   function create (tag, props, children) {
     let el, ns
     if (props.namespace) ns = props.namespace
@@ -304,8 +310,7 @@ function html () {
         key = lower(prop)
         value = props[prop]
         if (key == 'classname') {
-          key = 'class'
-          prop = 'class'
+          key = prop = 'class'
         }
         if (prop == 'htmlFor') prop = 'for'
         if (index(bool_props, key) != -1) {
@@ -319,11 +324,7 @@ function html () {
           el[prop] = value
         } else {
           if (ns) {
-            if (prop == 'xlink:href') {
-              el.setAttributeNS('', prop, value)
-            } else if (!xmlns.test(prop)) {
-              el.setAttributeNS(null, prop, value)
-            }
+            prop == 'xlink:href' ? set_ns(el, s, prop, value) : !test(xmlns, prop) && set_ns(el, null, prop, value)
           } else {
             el.setAttribute(prop, value)
           }
@@ -339,8 +340,8 @@ function html () {
           append_branch(node)
           continue
         }
-        if (typeof node == 'number' || typeof node == 'boolean' || typeof node == 'function'
-          || node instanceof Date || node instanceof RegExp) {
+        if (typeof node == 'number' || typeof node == 'boolean' || typeof node == func || node instanceof Date ||
+          node instanceof RegExp) {
           node = node.toString()
         }
         branch = el.childNodes[el.childNodes.length - 1]
@@ -349,16 +350,16 @@ function html () {
           had = false
           if (index(code_tags, node_name) == -1) {
             if (index(text_tags, node_name) == -1) {
-              value = r(r(r(r(branch.nodeValue, lead_line, ''), multi_space, ' '), trail_line, ''), trail_space, '')
-              value == '' ? el.removeChild(branch) : branch.nodeValue = value
+              value = r(r(r(r(branch.nodeValue, lead_line, s), multi_space, p), trail_line, s), trail_space, s)
+              value == s ? el.removeChild(branch) : branch.nodeValue = value
             } else {
-              branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? ' ' : ''), lead_space, ' '),
-                multi_space, ' '), trail_line, ''), trail_space, '')
+              branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? p : s), lead_space, p),
+                multi_space, p), trail_line, s), trail_space, s)
             }
           }
         }
 
-        if (typeof node == 'string') {
+        if (typeof node == string) {
           had = true
           if (branch && branch.nodeName == '#text') {
             branch.nodeValue += node
@@ -379,12 +380,12 @@ function html () {
     return el
   }
 
-  function string (x) {
-    return typeof x == 'function' || typeof x == 'string' || typeof x == 'object' ? x : !x ? '' : concat('', x)
+  function string_func (x) {
+    return typeof x == func || typeof x == obj || typeof x == string ? x : !x ? s : concat(s, x)
   }
 
   this.html = function (strings) {
-    let arg, closed = false, i = 0, length = strings.length, part, state = text_attr, text = '', xstate
+    let arg, closed = false, i = 0, length = strings.length, part, state = text_attr, text = s, xstate
     const arglen = arguments.length, parts = []
     for (; i < length; i++) {
       if (i < arglen - 1) {
@@ -394,9 +395,9 @@ function html () {
         if (xstate == attr_dq || xstate == attr_sq || xstate == attr_value_w) xstate = attr_value
         if (xstate == attr) xstate = attr_key
         if (xstate == open_attr) {
-          if (text == '/') {
-            part.push([open_attr, '/', arg])
-            text = ''
+          if (text == slash) {
+            part.push([open_attr, slash, arg])
+            text = s
           } else {
             part.push([open_attr, arg])
           }
@@ -418,13 +419,13 @@ function html () {
         char = string.charAt(i)
         if (state == text_attr && char == '<') {
           if (text.length) result.push([text_attr, text])
-          text = ''
+          text = s
           state = open_attr
           style_tag = false
         } else if (char == '>' && !is_quote(state) && state != comment) {
           if (state == open_attr && text.length) {
             result.push([open_attr, text])
-            text == 'style' ? style_tag = true : text == '/style' ? style_tag = false : ''
+            text == style ? style_tag = true : text == sstyle ? style_tag = false : s
           } else if (state == attr_key) {
             result.push([attr_key, text])
           } else if (state == attr_value && text.length) {
@@ -435,72 +436,70 @@ function html () {
           } else {
             result.push([close_attr, closed])
             closed = false
-            text = ''
+            text = s
           }
           state = text_attr
-        } else if (state == comment && end_hyphen.test(text) && char == '-') {
+        } else if (state == comment && test(end_hyphen, text) && char == '-') {
           if (options.comments) result.push([attr_value, text.substr(0, text.length - 1)])
-          text = ''
+          text = s
           closed = true
           state = text_attr
-        } else if (state == open_attr && start_comment.test(text)) {
+        } else if (state == open_attr && test(start_comment, text)) {
           if (options.comments) result.push([open_attr, text], [attr_key, 'comment'], [attr_eq])
           text = char
           state = comment
-        } else if (state == text_attr || state == comment) {
-          text += char
-        } else if (state == open_attr && char == '/' && text.length) {
+        } else if (state == open_attr && char == slash && text.length) {
           closed = true
-        } else if (state == open_attr && whitespace.test(char)) {
+        } else if (state == open_attr && test(whitespace, char)) {
           if (text.length) result.push([open_attr, text])
-          text == 'style' ? style_tag = true : text == '/style' ? style_tag = false : ''
-          text = ''
+          text == style ? style_tag = true : text == sstyle ? style_tag = false : s
+          text = s
           state = attr
-        } else if (state == open_attr) {
+        } else if (state == open_attr || state == text_attr || state == comment) {
           text += char
-        } else if (state == attr && not_whitespace.test(char)) {
+        } else if (state == attr && test(not_whitespace, char)) {
           state = attr_key
           text = char
-        } else if (state == attr && whitespace.test(char)) {
+        } else if (state == attr && test(whitespace, char)) {
           if (text.length) result.push([attr_key, text])
           result.push([attr_break])
-        } else if (state == attr_key && whitespace.test(char)) {
+        } else if (state == attr_key && test(whitespace, char)) {
           result.push([attr_key, text])
-          text = ''
+          text = s
           state = attr_key_w
-        } else if (state == attr_key && char == '=') {
+        } else if (state == attr_key && char == eq) {
           result.push([attr_key, text], [attr_eq])
-          text = ''
+          text = s
           state = attr_value_w
-        } else if (state == attr_key && char == '/') {
+        } else if (state == attr_key && char == slash) {
           closed = true
-          text = ''
+          text = s
           state = attr
         } else if (state == attr_key) {
           text += char
-        } else if ((state == attr_key_w || state == attr) && char == '=') {
+        } else if ((state == attr_key_w || state == attr) && char == eq) {
           result.push([attr_eq])
           state = attr_value_w
-        } else if ((state == attr_key_w || state == attr) && !whitespace.test(char)) {
+        } else if ((state == attr_key_w || state == attr) && !test(whitespace, char)) {
           result.push([attr_break])
-          if (word_or_hyphen.test(char)) {
+          if (test(word_or_hyphen, char)) {
             text += char
             state = attr_key
-          } else if (char == '/') {
+          } else if (char == slash) {
             closed = true
           } else {
             state = attr
           }
-        } else if (state == attr_value_w && char == '"') {
+        } else if (state == attr_value_w && char == dq) {
           state = attr_dq
-        } else if (state == attr_value_w && char == "'") {
+        } else if (state == attr_value_w && char == sq) {
           state = attr_sq
-        } else if ((state == attr_dq && char == '"') || (state == attr_sq && char == "'")
-          || (state == attr_value && whitespace.test(char))) {
+        } else if ((state == attr_dq && char == dq) || (state == attr_sq && char == sq)
+          || (state == attr_value && test(whitespace, char))) {
           result.push([attr_value, text], [attr_break])
-          text = ''
+          text = s
           state = attr
-        } else if (state == attr_value_w && !whitespace.test(char)) {
+        } else if (state == attr_value_w && !test(whitespace, char)) {
           state = attr_value
           i--
         } else if (state == attr_value || state == attr_sq || state == attr_dq) {
@@ -509,23 +508,24 @@ function html () {
       }
       if (state == text_attr && text.length) {
         result.push([text_attr, text])
-        text = ''
+        text = s
       } else if (text.length && (state == attr_value || state == attr_dq || state == attr_sq)) {
         result.push([attr_value, text])
-        text = ''
+        text = s
       } else if (state == attr_key) {
         result.push([attr_key, text])
-        text = ''
+        text = s
       }
       return result
     }
 
-    let j, segment, segments, tree = [null, {}, []]
+    let j, key, old_key, segment, segments, tree = [null, {}, []]
     const stack = [[tree, -1]]
     for (i = 0, length = parts.length; i < length; i++) {
       segments = stack[stack.length - 1][0]
-      part = parts[i], state = part[0]
-      if (state == open_attr && forward_slash.test(part[1])) {
+      part = parts[i]
+      state = part[0]
+      if (state == open_attr && test(forward_slash, part[1])) {
         if (stack.length > 1) {
           j = stack[stack.length - 1][1]
           stack.pop()
@@ -536,14 +536,14 @@ function html () {
         segments[2].push(segment)
         stack.push([segment, segments[2].length - 1])
       } else if (state == attr_key || (state == var_attr && part[1] == attr_key)) {
-        let key = '', copy_key
+        key = s
         for (length = parts.length; i < length; i++) {
           if (parts[i][0] == attr_key) {
             key = concat(key, parts[i][1])
           } else if (parts[i][0] == var_attr && parts[i][1] == attr_key) {
-            if (typeof parts[i][2] == 'object' && !key) {
-              for (copy_key in parts[i][2]) {
-                if (own(parts[i][2], copy_key) && !segments[1][copy_key]) segments[1][copy_key] = parts[i][2][copy_key]
+            if (typeof parts[i][2] == obj && !key) {
+              for (old_key in parts[i][2]) {
+                if (own(parts[i][2], old_key) && !segments[1][old_key]) segments[1][old_key] = parts[i][2][old_key]
               }
             } else {
               key = concat(key, parts[i][2])
@@ -556,15 +556,15 @@ function html () {
         for (j = i, length = parts.length; i < length; i++) {
           if (parts[i][0] == attr_value || parts[i][0] == attr_key) {
             if (!segments[1][key]) {
-              segments[1][key] = string(parts[i][1])
+              segments[1][key] = string_func(parts[i][1])
             } else {
-              parts[i][1] == '' || (segments[1][key] = concat(segments[1][key], parts[i][1]))
+              parts[i][1] == s || (segments[1][key] = concat(segments[1][key], parts[i][1]))
             }
           } else if (parts[i][0] == var_attr && (parts[i][1] == attr_value || parts[i][1] == attr_key)) {
             if (!segments[1][key]) {
-              segments[1][key] = string(parts[i][2])
+              segments[1][key] = string_func(parts[i][2])
             } else {
-              parts[i][2] == '' || (segments[1][key] = concat(segments[1][key], parts[i][2]))
+              parts[i][2] == s || (segments[1][key] = concat(segments[1][key], parts[i][2]))
             }
           } else {
             if (key && !segments[1][key] && i == j && (parts[i][0] == close_attr || parts[i][0] == attr_break)) {
@@ -579,31 +579,31 @@ function html () {
       } else if (state == var_attr && part[1] == attr_key) {
         segments[1][part[2]] = true
       } else if (state == close_attr) {
-        closed = part[1] || void_closes.test(segments[0])
+        closed = part[1] || test(void_closes, segments[0])
         if (closed && stack.length) {
           j = stack[stack.length - 1][1]
           stack.pop()
           stack[stack.length - 1][0][2][j] = create(segments[0], segments[1], segments[2].length && segments[2])
         }
       } else if (state == var_attr && part[1] == text_attr) {
-        part[2] == null ? '' : concat('', part[2])
+        part[2] == null ? s : concat(s, part[2])
         is_array(part[2]) ? segments[2].push(...part[2]) : segments[2].push(part[2])
       } else if (state == text_attr) {
         segments[2].push(part[1])
       }
     }
     tree = tree[2]
-    if (tree.length > 1 && whitespace_only.test(tree[0])) tree.shift()
-    if (tree.length > 2 || (tree.length == 2 && single_char_only.test(tree[1]))) {
+    if (tree.length > 1 && test(whitespace_only, tree[0])) tree.shift()
+    if (tree.length > 2 || (tree.length == 2 && test(single_char_only, tree[1]))) {
       segments = tree, segment = document.createDocumentFragment()
       for (i = 0, length = segments.length; i < length; i++) {
-        if (typeof segments[i] == 'string') segments[i] = create_text_node(segments[i])
+        if (typeof segments[i] == string) segments[i] = create_text_node(segments[i])
         append_child(segment, segments[i])
       }
       return segment
     }
     tree = tree[0]
-    if (is_array(tree) && typeof tree[0] == 'string' && is_array(tree[2])) tree = create(tree[0], tree[1], tree[2])
+    if (is_array(tree) && typeof tree[0] == string && is_array(tree[2])) return create(tree[0], tree[1], tree[2])
     return tree
   }
 }
@@ -616,18 +616,19 @@ function process (state, relay) {
   })
 }
 
+const start = {}
+
 function load (state, relay) {
+  Object.assign(state, start)
   relay('change', [])
 }
 
 function route (state, relay) {
-  return html`<div id='xo'>wow</div>`
+  return html`<div id='xo'>${'wow'}</div>`
 }
-
-const start = {}
 
 choo = new choo()
 choo.use(process)
-choo.load((state, relay) => load({...state, ...start}, relay))
+choo.load(load)
 choo.route(route)
 choo.mount('xo')
