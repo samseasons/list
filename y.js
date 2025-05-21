@@ -610,6 +610,342 @@ function html (options={}) {
 
 html = new html().html
 
+function random (bytes=6) {
+  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes))))
+}
+
+function cache () {
+  const a = 'a', b = 'b'
+  
+  window.IDBKeyRange = window.IDBKeyRange || window.msIDBKeyRange || window.webkitIDBKeyRange
+  window.IDBTransaction = window.IDBTransaction || window.msIDBTransaction || window.webkitIDBTransaction
+    || { READ_WRITE: 'readwrite' }
+
+  function indexed_db () {
+    return window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB
+  }
+
+  this.db = ''
+
+  this.open = function () {
+    return new Promise(resolve => {
+      if (this.db) resolve(this.db)
+      const request = indexed_db().open('', 1)
+      request.onerror = function (event) { 
+        console.error(event)
+        resolve(false)
+      }
+      request.onsuccess = function () {
+        this.db = request.result
+        this.db.onversionchange = function () { this.db.close() }
+        resolve(this.db)
+      }
+      request.onupgradeneeded = function () {
+        this.db = request.result
+        const keys = [a, b]
+        keys.forEach(a => {
+          if (!this.db.objectStoreNames.contains(a)) { this.db.createObjectStore(a, {autoIncrement: true}) }
+        })
+        resolve(this.db)
+      }
+    })
+  }
+
+  this.open()
+
+  function exists (store, key, db) {
+    return new Promise(resolve => {
+      const request = db.transaction(store, 'readwrite').objectStore(store).get(key)
+      request.onsuccess = (event) => { resolve(event.target.result) }
+      request.onerror = () => { resolve(false) }
+    })
+  }
+
+  this.new_key = function (key, db) {
+    return new Promise(resolve => {
+      key = key[0] + random()
+      const request = db.transaction(b, 'readwrite').objectStore(b).get(key)
+      request.onsuccess = (event) => {
+        resolve(event.target.result ? this.new_key(store, key, db) : key)
+      }
+      request.onerror = () => { resolve(false) }
+    })
+  }
+
+  function delete_key (key, store, db) {
+    return new Promise(resolve => {
+      const request = db.transaction(store, 'readwrite').objectStore(store).delete(key)
+      request.onsuccess = function (event) { resolve(event.target.result) }
+      request.onerror = function () { resolve(false) }
+    })
+  }
+
+  this.delete_file = function (name) {
+    return new Promise(resolve => {
+      this.open().then(db => { if (db) {
+        const request = db.transaction(a, 'readonly').objectStore(a).get(name)
+        request.onsuccess = function (event) {
+          let result = event.target.result
+          if (result && result[0] == a) {
+            try {
+              delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
+            } catch {
+              resolve(false)
+            }
+          } else {
+            resolve(false)
+          }
+        }
+      }})
+    })
+  }
+
+  this.delete_folder = function (name) {
+    return new Promise(resolve => {
+      this.open().then(db => { if (db) {
+        let request = db.transaction(a, 'readonly').objectStore(a).get(name)
+        request.onsuccess = function (event) {
+          let result = event.target.result
+          if (result) {
+            if (result[0] == a) {
+              try {
+                delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
+              } catch {
+                resolve(false)
+              }
+            } else {
+              const folders = db.transaction(a, 'readonly').objectStore(a).get(result)
+              if (folders.length == 0) {
+                try {
+                  delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
+                } catch {
+                  resolve(false)
+                }
+              }
+              const promises = folders.map(name => { return new Promise(resolve => resolve(delete_folder(name))) })
+              Promise.all(promises).then(resolved => resolve(resolved))
+            }
+          } else {
+            resolve(false)
+          }
+        }
+      }})
+    })
+  }
+
+  function put (name, key, blob, db) {
+    return new Promise(resolve => {
+      let request = db.transaction(a, 'readwrite').objectStore(a).put(key, name)
+      request.onsuccess = function (event) {
+        if (event.target.result) {
+          request = db.transaction(b, 'readwrite').objectStore(b).put(blob, key)
+          request.onsuccess = function (event) {
+            resolve(event.target.result)
+          }
+          request.onerror = function (error) {
+            console.error(error, 'key', key, 'not added')
+            resolve(false)
+          }
+        }
+      }
+      request.onerror = function (error) {
+        console.error(error, 'blob', name, 'not added')
+        resolve(false)
+      }
+    })
+  }
+
+  this.mkdir = function (name) {
+    return new Promise(resolve => {
+      this.open().then(db => { if (db) {
+        const split = name.split('/')
+        for (let i = 0, j, length = split.length, subfolder; i < length; i++) {
+          j = i + 1
+          subfolder = split.slice(0, j).join('/')
+          exists(a, subfolder, db).then(found => {
+            if (found) {
+              resolve(true)
+            } else {
+              this.new_key(b + random(), db).then(key => {
+                put(subfolder, key, j == length ? [] : split.slice(i, j), db).then(done => {
+                  if (done && j == length) {
+                    resolve(true)
+                  } else if (j == length) {
+                    resolve(false)
+                  }
+                })
+              })
+            }
+          })
+        }
+      }})
+    })
+  }
+
+  this.read = function (name) {
+    return new Promise(resolve => {
+      this.open().then(db => { if (db) {
+        let request = db.transaction(a, 'readonly').objectStore(a).get(name)
+        request.onsuccess = function (event) {
+          let result = event.target.result
+          if (event.target.result) {
+            request = db.transaction(b, 'readonly').objectStore(b).get(result)
+            request.onsuccess = function (event) {
+              result = event.target.result
+              resolve(result || false)
+            }
+          } else {
+            resolve(false)
+          }
+        }
+      }})
+    })
+  }
+
+  function read_value (name, db, store) {
+    return new Promise(resolve => {
+      let request = db.transaction(store, 'readonly').objectStore(store).get(name)
+      request.onsuccess = function (event) {
+        resolve(event.target.result)
+      }
+    })
+  }
+
+  this.rename = function (a, db, dup, name) {
+    return new Promise(resolve => {
+      const split = name.split('.')
+      const check = dup > 0 ? split.slice(0, -1).join('.') + ' (' + dup.toString() + ').' + split.slice(-1) : name
+      exists(a, check, db).then(found => {
+        if (found) {
+          dup++
+          resolve(this.rename(a, db, dup, name))
+        } else {
+          resolve(check)
+        }
+      })
+    })
+  }
+
+  this.write = function (name, blob) {
+    return new Promise(resolve => {
+      this.open().then(db => { if (db) {
+        let dup = 0, folder = name.split('/').slice(0, -1).join('/')
+        this.rename(a, db, dup, name).then(name => {
+          this.new_key(a + random(), db).then(key => put(name, key, blob, db).then(resolved => {
+            const file = name.split('/').slice(-1)[0]
+            exists(a, folder, db).then(key => {
+              if (!key) {
+                this.mkdir(folder).then(resolved => {
+                  if (resolved) {
+                    this.read(folder).then(contents => {
+                      contents = contents || []
+                      contents.push(file)
+                      this.new_key(b + random(), db).then(key => resolve(put(folder, key, contents, db)))
+                    })
+                  }
+                })
+              } else {
+                this.read(folder).then(contents => {
+                  contents = contents || []
+                  contents.push(file)
+                  resolve(put(folder, key, contents, db))
+                })
+              }
+            })
+          }))
+        })
+      }})
+    })
+  }
+
+  this.folder_add = function (new_name, db) {
+    return new Promise(resolve => {
+      const split = new_name.split('/')
+      const file = split.slice(-1)
+      const folder = split.slice(0, -1).join('/')
+      this.mkdir(folder).then(resolved => {
+        if (resolved) {
+          let request = db.transaction(a, 'readonly').objectStore(a).get(folder)
+          request.onsuccess = function (event) {
+            const key = event.target.result
+            if (key) {
+              request = db.transaction(b, 'readonly').objectStore(b).get(key)
+              request.onsuccess = function (event) {
+                const result = event.target.result
+                resolve(put(folder, key, result.concat(file), db))
+              }
+            }
+          }
+        } else {
+          resolve(false)
+        }
+      })
+    })
+  }
+
+  this.copy = function (old_name, new_name) {
+    return new Promise(resolve => {
+      if (old_name != new_name) {
+        this.open().then(db => { if (db) {
+          this.read(new_name).then(found => { if (!found) {
+            read_value(old_name, db, a).then(key => {
+              read_value(key, db, b).then(file => {
+                this.folder_add(new_name, db).then(c => {
+                  resolve(put(new_name, key, file, db))
+                })
+              })
+            })
+          }})
+        }})
+      }
+    })
+  }
+
+  this.folder_remove = function (old_name, db) {
+    return new Promise(resolve => {
+      const split = old_name.split('/')
+      const file = split.slice(-1)
+      const folder = split.slice(0, -1).join('/')
+      let request = db.transaction(a, 'readonly').objectStore(a).get(folder)
+      request.onsuccess = function (event) {
+        const key = event.target.result
+        if (key) {
+          request = db.transaction(b, 'readonly').objectStore(b).get(key)
+          request.onsuccess = function (event) {
+            const result = event.target.result
+            resolve(put(folder, key, result.filter(f => f != file), db))
+          }
+        }
+        resolve(false)
+      }
+    })
+  }
+
+  this.move = function (old_name, new_name) {
+    return new Promise(resolve => {
+      if (old_name != new_name) {
+        this.open().then(db => { if (db) {
+          this.read(new_name).then(found => { if (!found) {
+            read_value(old_name, db, a).then(key => {
+              read_value(key, db, b).then(file => {
+                this.folder_add(new_name, db).then(c => {
+                  put(new_name, key, file, db).then(c => {
+                    this.folder_remove(old_name, db).then(c => {
+                      resolve(delete_key(old_name, a, db))
+                    })
+                  })
+                })
+              })
+            })
+          }})
+        }})
+      }
+    })
+  }
+}
+
+cache = new cache()
+
 function process (state, relay) {
   relay.b('change', function (args) {
     if (!state.test) state.test = args
