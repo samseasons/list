@@ -1,5 +1,6 @@
 function choo () {
-  const s = '', events = ['abort', 'click', 'error', 'keydown', 'load', 'loadend', 'message', 'mousedown', 'mousemove',
+  const s = ''
+  const events = ['abort', 'click', 'error', 'keydown', 'load', 'loadend', 'message', 'mousedown', 'mousemove',
     'online', 'open', 'popstate', 'success', 'touchmove', 'upgradeneeded', 'versionchange'].map(event => 'on' + event)
 
   function remove_attribute (node, name) {
@@ -22,7 +23,7 @@ function choo () {
   }
 
   function morph_input (new_node, old_node) {
-    let new_value = new_node.value, old_value = old_node.value, value = 'value'
+    const new_value = new_node.value, old_value = old_node.value, value = 'value'
     morph_attribute(new_node, old_node, 'checked')
     morph_attribute(new_node, old_node, 'disabled')
     if (new_value != old_value || old_node.type == 'range') set_attribute(old_node, value, new_value)
@@ -30,7 +31,8 @@ function choo () {
   }
 
   function replace_attributes (new_node, old_node) {
-    let new_attrs = new_node.attributes, old_attrs = old_node.attributes, i, attr, name, namespace, value
+    const new_attrs = new_node.attributes, old_attrs = old_node.attributes
+    let i, attr, name, namespace, value
     for (i = new_attrs.length; i--;) {
       attr = new_attrs[i]
       name = attr.name
@@ -65,10 +67,10 @@ function choo () {
   }
 
   function morph_textarea (new_node, old_node) {
-    let new_value = new_node.value, child
+    const new_value = new_node.value
     if (new_value != old_node.value) {
       old_node.value = new_value
-      child = old_node.firstChild
+      const child = old_node.firstChild
       if (child && child.nodeValue != new_value && !(new_value == s && child.nodeValue == old_node.placeholder)) {
         child.nodeValue = new_value
       }
@@ -76,7 +78,7 @@ function choo () {
   }
 
   function morph (new_node, old_node) {
-    let new_type = new_node.nodeType, new_name = new_node.nodeName, new_value = new_node.nodeValue
+    const new_type = new_node.nodeType, new_name = new_node.nodeName, new_value = new_node.nodeValue
     if (new_type == 3 || new_type == 8) {
       old_node.nodeValue = new_value
     } else if (new_type == 1) {
@@ -139,7 +141,7 @@ function choo () {
   function walk (new_node, old_node) {
     if (new_node.f) {
       old_node = new_node.f
-      new_node = new_node.e(new_node.d, new_node.b)
+      new_node = new_node.d(new_node.e, new_node.b)
     }
     if (!old_node) {
       return new_node
@@ -153,31 +155,6 @@ function choo () {
     morph(new_node, old_node)
     update(new_node, old_node)
     return old_node
-  }
-
-  function relay () {
-    this.a = function (event) {
-      event = this.c[event]
-      if (event) {
-        let data = [], i, length = arguments.length
-        for (i = 1; i < length; i++) {
-          data.push(arguments[i])
-        }
-        for (length = event.length, i = 0; i < length; i++) {
-          listener = event[i]
-          listener.apply(listener, data)
-        }
-      } 
-      return this
-    }
-    this.on = this.b = function (event, listener) {
-      if (!this.c[event]) {
-        this.c[event] = []
-      }
-      this.c[event].push(listener)
-      return this
-    }
-    this.c = {}
   }
 
   function traverse (node) {
@@ -196,7 +173,30 @@ function choo () {
         callback(node)
       }
     }
-    window.ontouchstart = event => event.preventDefault()
+  }
+
+  function relay () {
+    this.a = event => {
+      event = this.c[event]
+      if (event) {
+        const data =[]
+        let i, length = arguments.length
+        for (i = 1; i < length; i++) {
+          data.push(arguments[i])
+        }
+        for (length = event.length, i = 0; i < length; i++) {
+          listener = event[i]
+          listener.apply(listener, data)
+        }
+      } 
+      return this
+    }
+    this.on = this.b = (event, listener) => {
+      if (!this.c[event]) this.c[event] = []
+      this.c[event].push(listener)
+      return this
+    }
+    this.c = {}
   }
 
   this.a = new relay()
@@ -216,7 +216,7 @@ function choo () {
   }
 
   this.route = function (route) {
-    this.e = route
+    this.d = route
   }
 
   this.mount = function (node) {
@@ -229,7 +229,7 @@ function choo () {
         walk(self)
       }
     })
-    self.c.forEach(func => func(self.d))
+    self.c.forEach(func => func(self.e))
     self.f = document.getElementById(node)
     walk(self)
   }
@@ -615,80 +615,74 @@ function random (bytes=6) {
 }
 
 function cache () {
-  const a = 'a', b = 'b'
+  const a = 'a', b = 'b', dot = '.', r = 'readonly', rw = 'readwrite', s = '', slash = '/'
+  this.c = s
   
   window.IDBKeyRange = window.IDBKeyRange || window.msIDBKeyRange || window.webkitIDBKeyRange
   window.IDBTransaction = window.IDBTransaction || window.msIDBTransaction || window.webkitIDBTransaction
-    || { READ_WRITE: 'readwrite' }
+    || { READ_WRITE: rw }
 
   function indexed_db () {
-    return window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB
+    return window.indexedDB || window.mozIndexedDB || window.msIndexedDB || window.webkitIndexedDB
   }
-
-  this.db = ''
 
   this.open = function () {
     return new Promise(resolve => {
-      if (this.db) resolve(this.db)
-      const request = indexed_db().open('', 1)
-      request.onerror = function (event) { 
-        console.error(event)
-        resolve(false)
-      }
+      if (this.c) resolve(this.c)
+      const request = indexed_db().open(s, 1)
+      request.onerror = error => console.error(error, 'not open') && resolve(false)
       request.onsuccess = function () {
-        this.db = request.result
-        this.db.onversionchange = function () { this.db.close() }
-        resolve(this.db)
+        this.c = request.result
+        this.c.onversionchange = function () { this.c.close() }
+        resolve(this.c)
       }
       request.onupgradeneeded = function () {
-        this.db = request.result
+        this.c = request.result
         const keys = [a, b]
         keys.forEach(a => {
-          if (!this.db.objectStoreNames.contains(a)) { this.db.createObjectStore(a, {autoIncrement: true}) }
+          if (!this.c.objectStoreNames.contains(a)) { this.c.createObjectStore(a, {autoIncrement: true}) }
         })
-        resolve(this.db)
+        resolve(this.c)
       }
     })
   }
 
   this.open()
 
-  function exists (store, key, db) {
+  function exists (store, key, c) {
     return new Promise(resolve => {
-      const request = db.transaction(store, 'readwrite').objectStore(store).get(key)
-      request.onsuccess = (event) => { resolve(event.target.result) }
-      request.onerror = () => { resolve(false) }
+      const request = c.transaction(store, r).objectStore(store).get(key)
+      request.onsuccess = event => resolve(event.target.result)
+      request.onerror = resolve(false)
     })
   }
 
-  this.new_key = function (key, db) {
+  function get_key (key, c) {
     return new Promise(resolve => {
-      key = key[0] + random()
-      const request = db.transaction(b, 'readwrite').objectStore(b).get(key)
-      request.onsuccess = (event) => {
-        resolve(event.target.result ? this.new_key(store, key, db) : key)
-      }
-      request.onerror = () => { resolve(false) }
+      key = key[0] + random(6)
+      const request = c.transaction(b, r).objectStore(b).get(key)
+      request.onsuccess = event => resolve(event.target.result ? get_key(key, c) : key)
+      request.onerror = event => resolve(false)
     })
   }
 
-  function delete_key (key, store, db) {
+  function delete_key (key, store, c) {
     return new Promise(resolve => {
-      const request = db.transaction(store, 'readwrite').objectStore(store).delete(key)
-      request.onsuccess = function (event) { resolve(event.target.result) }
-      request.onerror = function () { resolve(false) }
+      const request = c.transaction(store, rw).objectStore(store).delete(key)
+      request.onsuccess = event => resolve(event.target.result)
+      request.onerror = event => resolve(false)
     })
   }
 
   this.delete_file = function (name) {
     return new Promise(resolve => {
-      this.open().then(db => { if (db) {
-        const request = db.transaction(a, 'readonly').objectStore(a).get(name)
-        request.onsuccess = function (event) {
-          let result = event.target.result
-          if (result && result[0] == a) {
+      this.open().then(c => { if (c) {
+        const request = c.transaction(a, r).objectStore(a).get(name)
+        request.onsuccess = event => {
+          const result = event.target.result
+          if (result && result[0] == b) {
             try {
-              delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
+              delete_key(name, a, c).then(deleted => resolve(deleted ? delete_key(result, b, c) : false))
             } catch {
               resolve(false)
             }
@@ -700,56 +694,101 @@ function cache () {
     })
   }
 
+  function remove_folder (old_name, c) {
+    return new Promise(resolve => {
+      const split = old_name.split(slash)
+      if (split.length > 1) {
+        const folder = split.slice(0, -1).join(slash)
+        let request = c.transaction(a, r).objectStore(a).get(folder)
+        request.onsuccess = event => {
+          const key = event.target.result
+          if (key) {
+            const file = split.slice(-1)
+            request = c.transaction(b, r).objectStore(b).get(key)
+            request.onsuccess = event => resolve(put(folder, key, event.target.result.filter(f => f != file), c))
+          }
+          resolve(false)
+        }
+      } else {
+        resolve(true)
+      }
+    })
+  }
+
   this.delete_folder = function (name) {
     return new Promise(resolve => {
-      this.open().then(db => { if (db) {
-        let request = db.transaction(a, 'readonly').objectStore(a).get(name)
-        request.onsuccess = function (event) {
-          let result = event.target.result
-          if (result) {
-            if (result[0] == a) {
-              try {
-                delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
-              } catch {
-                resolve(false)
-              }
-            } else {
-              const folders = db.transaction(a, 'readonly').objectStore(a).get(result)
-              if (folders.length == 0) {
+      this.open().then(c => { if (c) {
+        remove_folder(name, c).then(done => {
+          let request = c.transaction(a, r).objectStore(a).get(name)
+          request.onsuccess = event => {
+            const result = event.target.result
+            if (result) {
+              if (result[0] == b) {
                 try {
-                  delete_key(name, a, db).then(deleted => { resolve(deleted ? delete_key(result, b, db) : false) })
+                  delete_key(name, a, c).then(deleted => resolve(deleted ? delete_key(result, b, c) : false))
                 } catch {
                   resolve(false)
                 }
+              } else {
+                request = c.transaction(b, r).objectStore(b).get(result)
+                request.onsuccess = event => {
+                  const folders = event.target.result
+                  if (folders) {
+                    if (folders.length == 0) {
+                      try {
+                        delete_key(name, a, c).then(deleted => resolve(deleted ? delete_key(result, b, c) : false))
+                      } catch {
+                        resolve(false)
+                      }
+                    }
+                    const promises = folders.map(name => { return new Promise(resolve => resolve(this.delete_folder(name))) })
+                    Promise.all(promises).then(resolved => resolve(resolved))
+                  }
+                }
               }
-              const promises = folders.map(name => { return new Promise(resolve => resolve(delete_folder(name))) })
-              Promise.all(promises).then(resolved => resolve(resolved))
+            } else {
+              resolve(false)
             }
-          } else {
-            resolve(false)
           }
-        }
+        })
       }})
     })
   }
 
-  function put (name, key, blob, db) {
+  this.available = function (length) {
     return new Promise(resolve => {
-      let request = db.transaction(a, 'readwrite').objectStore(a).put(key, name)
-      request.onsuccess = function (event) {
-        if (event.target.result) {
-          request = db.transaction(b, 'readwrite').objectStore(b).put(blob, key)
-          request.onsuccess = function (event) {
-            resolve(event.target.result)
+      navigator.storage.estimate().then(({usage, quota}) => {
+        const free_space = Math.min(quota * 0.2, 2147483648) - usage
+        if (length) {
+          const past = 10485761 + length - free_space
+          if (past > 0) {
+            console.error(past, 'bytes past limit')
+            resolve(false)
+          } else {
+            resolve(true)
           }
-          request.onerror = function (error) {
-            console.error(error, 'key', key, 'not added')
+        } else {
+          resolve(free_space)
+        }
+      })
+    })
+  }
+
+  function put (name, key, blob, c) {
+    return new Promise(resolve => {
+      let request = c.transaction(a, rw).objectStore(a).put(key, name)
+      request.onsuccess = event => {
+        if (event.target.result) {
+          request = c.transaction(b, rw).objectStore(b).put(blob, key)
+          request.onsuccess = event => resolve(event.target.result)
+          request.onerror = error => {
+            console.error('put key', key, error)
             resolve(false)
           }
         }
       }
-      request.onerror = function (error) {
-        console.error(error, 'blob', name, 'not added')
+      request.onerror = error => {
+        console.error('put blob', name, error)
         resolve(false)
       }
     })
@@ -757,43 +796,54 @@ function cache () {
 
   this.mkdir = function (name) {
     return new Promise(resolve => {
-      this.open().then(db => { if (db) {
-        const split = name.split('/')
-        for (let i = 0, j, length = split.length, subfolder; i < length; i++) {
-          j = i + 1
-          subfolder = split.slice(0, j).join('/')
-          exists(a, subfolder, db).then(found => {
-            if (found) {
-              resolve(true)
-            } else {
-              this.new_key(b + random(), db).then(key => {
-                put(subfolder, key, j == length ? [] : split.slice(i, j), db).then(done => {
-                  if (done && j == length) {
-                    resolve(true)
-                  } else if (j == length) {
-                    resolve(false)
-                  }
-                })
-              })
-            }
-          })
-        }
+      this.open().then(c => { if (c) {
+        this.available(name.length).then(enough => { if (enough) {
+          const split = name.split(slash)
+          for (let i = 0, length = split.length, subfolder; i < length; i++) {
+            subfolder = split.slice(0, i + 1).join(slash)
+            this.read(subfolder).then(found => {
+              if (found) {
+                resolve(true)
+              } else {
+                const split = subfolder.split(slash)
+                if (split.length > 1) {
+                  const folder = split.slice(0, -1).join(slash)
+                  this.read(folder).then(contents => {
+                    contents = contents || []
+                    contents.push(split.slice(-1)[0])
+                    get_key(a, c).then(key => {
+                      put(folder, key, contents, c).then(done => {
+                        get_key(a, c).then(key => resolve(put(subfolder, key, [], c)))
+                      })
+                    })
+                  })
+                } else {
+                  get_key(a, c).then(key => resolve(put(subfolder, key, [], c)))
+                }
+              }
+            })
+          }
+        }})
       }})
+    })
+  }
+
+  function read_value (name, c, store) {
+    return new Promise(resolve => {
+      const request = c.transaction(store, r).objectStore(store).get(name)
+      request.onsuccess = event => resolve(event.target.result)
     })
   }
 
   this.read = function (name) {
     return new Promise(resolve => {
-      this.open().then(db => { if (db) {
-        let request = db.transaction(a, 'readonly').objectStore(a).get(name)
-        request.onsuccess = function (event) {
+      this.open().then(c => { if (c) {
+        let request = c.transaction(a, r).objectStore(a).get(name)
+        request.onsuccess = event => {
           let result = event.target.result
-          if (event.target.result) {
-            request = db.transaction(b, 'readonly').objectStore(b).get(result)
-            request.onsuccess = function (event) {
-              result = event.target.result
-              resolve(result || false)
-            }
+          if (result) {
+            request = c.transaction(b, r).objectStore(b).get(result)
+            request.onsuccess = event => resolve(event.target.result || false)
           } else {
             resolve(false)
           }
@@ -802,25 +852,23 @@ function cache () {
     })
   }
 
-  function read_value (name, db, store) {
+  function rename (d, c, dup, name) {
     return new Promise(resolve => {
-      let request = db.transaction(store, 'readonly').objectStore(store).get(name)
-      request.onsuccess = function (event) {
-        resolve(event.target.result)
+      let renamed, split = name.split(slash)
+      const file = split.slice(-1)[0], folder = split.slice(0, -1).join(slash)
+      split = file.split(dot)
+      if (split.length > 1) {
+        renamed = dup > 0 ? split.slice(0, -1).join(dot) + ' (' + dup.toString() + ').' + split.slice(-1) : file
+      } else {
+        renamed = dup > 0 ? file + ' (' + dup.toString() + ')' : file
       }
-    })
-  }
-
-  this.rename = function (a, db, dup, name) {
-    return new Promise(resolve => {
-      const split = name.split('.')
-      const check = dup > 0 ? split.slice(0, -1).join('.') + ' (' + dup.toString() + ').' + split.slice(-1) : name
-      exists(a, check, db).then(found => {
+      renamed = folder + slash + renamed
+      exists(d, renamed, c).then(found => {
         if (found) {
           dup++
-          resolve(this.rename(a, db, dup, name))
+          resolve(rename(d, c, dup, name))
         } else {
-          resolve(check)
+          resolve(renamed)
         }
       })
     })
@@ -828,52 +876,64 @@ function cache () {
 
   this.write = function (name, blob) {
     return new Promise(resolve => {
-      this.open().then(db => { if (db) {
-        let dup = 0, folder = name.split('/').slice(0, -1).join('/')
-        this.rename(a, db, dup, name).then(name => {
-          this.new_key(a + random(), db).then(key => put(name, key, blob, db).then(resolved => {
-            const file = name.split('/').slice(-1)[0]
-            exists(a, folder, db).then(key => {
-              if (!key) {
-                this.mkdir(folder).then(resolved => {
-                  if (resolved) {
+      this.open().then(c => { if (c) {
+        if (!(blob instanceof Blob)) blob = new Blob([blob])
+        this.available(blob.size).then(enough => { if (enough) {
+          let dup = 0, folder = name.split(slash).slice(0, -1).join(slash)
+          rename(b, c, dup, name).then(name => {
+            get_key(b, c).then(key => 
+              put(name, key, blob, c).then(resolved => { if (resolved) {
+                const file = name.split(slash).slice(-1)[0]
+                exists(a, folder, c).then(key => {
+                  if (!key) {
+                    this.mkdir(folder).then(resolved => { if (resolved) {
+                      this.read(folder).then(contents => {
+                        contents = contents || []
+                        contents.push(file)
+                        get_key(b, c).then(key => resolve(put(folder, key, contents, c)))
+                      })
+                    }})
+                  } else {
                     this.read(folder).then(contents => {
                       contents = contents || []
                       contents.push(file)
-                      this.new_key(b + random(), db).then(key => resolve(put(folder, key, contents, db)))
+                      resolve(put(folder, key, contents, c))
                     })
                   }
                 })
-              } else {
-                this.read(folder).then(contents => {
-                  contents = contents || []
-                  contents.push(file)
-                  resolve(put(folder, key, contents, db))
-                })
-              }
-            })
-          }))
-        })
+              }})
+            )
+          })
+        }})
       }})
     })
   }
 
-  this.folder_add = function (new_name, db) {
+  this.append = function (name, blob) {
     return new Promise(resolve => {
-      const split = new_name.split('/')
-      const file = split.slice(-1)
-      const folder = split.slice(0, -1).join('/')
+      this.open().then(c => { if (c) {
+        if (!(blob instanceof Blob)) blob = new Blob([blob])
+        this.available(blob.size).then(enough => { if (enough) {
+          this.read(name).then(found => {
+            resolve(this.write(name, found ? new Blob([found, blob]) : blob))
+          })
+        }})
+      }})
+    })
+  }
+
+  this.add_folder = function (name, c) {
+    return new Promise(resolve => {
+      const split = name.split(slash)
+      const folder = split.slice(0, -1).join(slash)
       this.mkdir(folder).then(resolved => {
         if (resolved) {
-          let request = db.transaction(a, 'readonly').objectStore(a).get(folder)
-          request.onsuccess = function (event) {
+          let request = c.transaction(a, r).objectStore(a).get(folder)
+          request.onsuccess = event => {
             const key = event.target.result
             if (key) {
-              request = db.transaction(b, 'readonly').objectStore(b).get(key)
-              request.onsuccess = function (event) {
-                const result = event.target.result
-                resolve(put(folder, key, result.concat(file), db))
-              }
+              request = c.transaction(b, r).objectStore(b).get(key)
+              request.onsuccess = event => resolve(put(folder, key, event.target.result.concat(split.slice(-1)), c))
             }
           }
         } else {
@@ -883,64 +943,34 @@ function cache () {
     })
   }
 
-  this.copy = function (old_name, new_name) {
+  this.copy = function (source, name, force=false, move=false) {
     return new Promise(resolve => {
-      if (old_name != new_name) {
-        this.open().then(db => { if (db) {
-          this.read(new_name).then(found => { if (!found) {
-            read_value(old_name, db, a).then(key => {
-              read_value(key, db, b).then(file => {
-                this.folder_add(new_name, db).then(c => {
-                  resolve(put(new_name, key, file, db))
-                })
-              })
-            })
-          }})
-        }})
-      }
-    })
-  }
-
-  this.folder_remove = function (old_name, db) {
-    return new Promise(resolve => {
-      const split = old_name.split('/')
-      const file = split.slice(-1)
-      const folder = split.slice(0, -1).join('/')
-      let request = db.transaction(a, 'readonly').objectStore(a).get(folder)
-      request.onsuccess = function (event) {
-        const key = event.target.result
-        if (key) {
-          request = db.transaction(b, 'readonly').objectStore(b).get(key)
-          request.onsuccess = function (event) {
-            const result = event.target.result
-            resolve(put(folder, key, result.filter(f => f != file), db))
-          }
-        }
-        resolve(false)
-      }
-    })
-  }
-
-  this.move = function (old_name, new_name) {
-    return new Promise(resolve => {
-      if (old_name != new_name) {
-        this.open().then(db => { if (db) {
-          this.read(new_name).then(found => { if (!found) {
-            read_value(old_name, db, a).then(key => {
-              read_value(key, db, b).then(file => {
-                this.folder_add(new_name, db).then(c => {
-                  put(new_name, key, file, db).then(c => {
-                    this.folder_remove(old_name, db).then(c => {
-                      resolve(delete_key(old_name, a, db))
+      if (source != name) {
+        this.open().then(c => { if (c) {
+          this.read(name).then(found => {
+            if (force || !found) {
+              read_value(source, c, b).then(key => {
+                read_value(key, c, a).then(file => {
+                  this.add_folder(name, c).then(a => {
+                    put(name, key, file, c).then(a => {
+                      if (move) {
+                        remove_folder(source, c).then(a => resolve(delete_key(source, b, c)))
+                      } else {
+                        resolve(true)
+                      }
                     })
                   })
                 })
               })
-            })
-          }})
+            }
+          })
         }})
       }
     })
+  }
+
+  this.rename = function (source, name, force=false) {
+    return new Promise(resolve => resolve(this.copy(source, name, force, true)))
   }
 }
 
