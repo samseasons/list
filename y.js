@@ -977,6 +977,101 @@ function cache () {
 
 cache = new cache()
 
+function bcdiff (past, next) {
+  if (past == next) return []
+
+  function suffix (bi, i, j, leaf) {
+    bi++
+    const new_char = next[bi]
+    if (typeof leaf == 'object') {
+      leaf[new_char] = new_char in leaf ? suffix(bi, i, j, leaf[new_char]) : i
+      return leaf
+    } else {
+      const old_i = leaf + 1, subleaf = {}
+      const old_char = next[old_i]
+      if (old_char == new_char) {
+        subleaf[old_char] = suffix(bi, i, j, old_i)
+      } else {
+        subleaf[new_char] = i
+        subleaf[old_char] = j
+      }
+      return subleaf
+    }
+  }
+
+  const patch = [], tree = {}
+  for (let leaf, i = 0, length = len(next); i < length; i++) {
+    char = next[i]
+    char1 = next[i + 1] || empty
+    if (char in tree) {
+      leaf = tree[char]
+      if (char1 in leaf) {
+        subleaf = leaf[char1]
+        leaf[char1] = suffix(i, i, subleaf, subleaf)[char1]
+      } else {
+        leaf[char1] = i
+        tree[char] = leaf
+      }
+    } else {
+      leaf = {}
+      leaf[char1] = i
+      tree[char] = leaf
+    }
+  }
+
+  function overlap (a, b) {
+    let i = 0, length = len(a)
+    while (i < length && a[i] == b[i]) i++
+    return a.slice(0, i)
+  }
+
+  function matches (query, string, i=0) {
+    let b = query[i]
+    if (b in string) {
+      b = string[b]
+      if (typeof b == 'number') {
+        return [b, len(overlap(query, next.slice(b)))]
+      } else if (typeof b == 'object') {
+        return matches(query, b, i + 1)
+      }
+    }
+    return falsee
+  }
+
+  let buffer = [], i = 0, length = len(past), match, pos
+  for (; i < length;) {
+    match = matches(past.slice(i), tree)
+    if (match) {
+      if (len(buffer) > 0) {
+        patch.push(buffer)
+        buffer = []
+      }
+      pos = match[0]
+      match = match[1]
+      patch.push(pos, pos + match)
+      i += match
+    } else {
+      buffer.push(past[i])
+      i++
+    }
+  }
+  if (len(buffer) > 0) patch.push(buffer)
+  return patch
+}
+
+function bcpatch (last, patch) {
+  let diff, i = 0, length = len(patch), past = []
+  for (; i < length; i++) {
+    diff = patch[i]
+    if (diff instanceof Array) {
+      past.push(...diff)
+    } else if (typeof diff == 'number') {
+      past.push(...last.slice(diff, patch[++i]))
+    }
+  }
+  return past
+}
+
 function process (state, relay) {
   relay.b('change', function (a1, a2) {
     if (!state[a1]) state[a1] = a2
