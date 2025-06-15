@@ -978,95 +978,95 @@ function cache () {
 cache = new cache()
 
 function bcdiff (past, next) {
-  if (past == next) return []
+  if (typeof next == 'string') next = next.split(empty)
+  if (typeof past == 'string') past = past.split(empty)
+  if (next.toString() == past.toString()) return [0]
 
-  function suffix (bi, i, j, leaf) {
-    bi++
-    const new_char = next[bi]
-    if (typeof leaf == 'object') {
-      leaf[new_char] = new_char in leaf ? suffix(bi, i, j, leaf[new_char]) : i
-      return leaf
-    } else {
-      const old_i = leaf + 1, subleaf = {}
-      const old_char = next[old_i]
-      if (old_char == new_char) {
-        subleaf[old_char] = suffix(bi, i, j, old_i)
+  function trie (i, j, kf, leaf) {
+    const a = next[++kf]
+    if (typeof leaf == 'number') {
+      const b = next[++leaf]
+      const leaves = {}
+      if (a == b) {
+        leaves[b] = trie(i, j, kf, leaf)
       } else {
-        subleaf[new_char] = i
-        subleaf[old_char] = j
+        leaves[a] = i
+        leaves[b] = j
       }
-      return subleaf
+      return leaves
+    } else if (typeof leaf == 'object') {
+      leaf[a] = a in leaf ? trie(i, j, kf, leaf[a]) : i
+      return leaf
     }
   }
 
   const patch = [], tree = {}
-  for (let leaf, i = 0, length = len(next); i < length; i++) {
-    char = next[i]
-    char1 = next[i + 1] || empty
-    if (char in tree) {
-      leaf = tree[char]
-      if (char1 in leaf) {
-        subleaf = leaf[char1]
-        leaf[char1] = suffix(i, i, subleaf, subleaf)[char1]
+  for (let a, b, branch, i = 0, length = len(next); i < length; i++) {
+    a = next[i]
+    b = next[i + 1]
+    if (a in tree) {
+      branch = tree[a]
+      if (b in branch) {
+        leaf = branch[b]
+        branch[b] = trie(i, leaf, i, leaf)[b]
       } else {
-        leaf[char1] = i
-        tree[char] = leaf
+        branch[b] = i
+        tree[a] = branch
       }
     } else {
-      leaf = {}
-      leaf[char1] = i
-      tree[char] = leaf
+      branch = {}
+      branch[b] = i
+      tree[a] = branch
     }
   }
 
-  function overlap (a, b) {
+  function overlaps (a, b) {
     let i = 0, length = len(a)
     while (i < length && a[i] == b[i]) i++
-    return a.slice(0, i)
+    return i
   }
 
-  function matches (query, string, i=0) {
-    let b = query[i]
-    if (b in string) {
-      b = string[b]
-      if (typeof b == 'number') {
-        return [b, len(overlap(query, next.slice(b)))]
-      } else if (typeof b == 'object') {
-        return matches(query, b, i + 1)
+  function matches (branch, query, i=0) {
+    let leaf = query[i]
+    if (leaf in branch) {
+      leaf = branch[leaf]
+      if (typeof leaf == 'number') {
+        return [leaf, overlaps(next.slice(leaf), query)]
+      } else if (typeof leaf == 'object') {
+        return matches(leaf, query, i + 1)
       }
+    } else if (i > 2) {
+      while (typeof branch != 'number') branch = Object.values(branch)[0]
+      return [branch, overlaps(next.slice(branch), query)]
     }
     return falsee
   }
 
   let buffer = [], i = 0, length = len(past), match, pos
-  for (; i < length;) {
-    match = matches(past.slice(i), tree)
+  while (i < length) {
+    match = matches(tree, past.slice(i))
     if (match) {
-      if (len(buffer) > 0) {
-        patch.push(buffer)
-        buffer = []
-      }
+      if (len(buffer) && patch.push(buffer)) buffer = []
       pos = match[0]
       match = match[1]
       patch.push(pos, pos + match)
       i += match
     } else {
-      buffer.push(past[i])
-      i++
+      buffer.push(past[i++])
     }
   }
-  if (len(buffer) > 0) patch.push(buffer)
+  if (len(buffer)) patch.push(buffer)
   return patch
 }
 
 function bcpatch (last, patch) {
   let diff, i = 0, length = len(patch), past = []
-  for (; i < length; i++) {
-    diff = patch[i]
+  while (i < length) {
+    diff = patch[i++]
     if (diff instanceof Array) {
       past.push(...diff)
     } else if (typeof diff == 'number') {
-      past.push(...last.slice(diff, patch[++i]))
+      past.push(...last.slice(diff, patch[i++]))
     }
   }
   return past
