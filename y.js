@@ -627,8 +627,67 @@ function html (comments) {
 
 html = new html().html
 
-function random (bytes=6) {
-  return btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(bytes))))
+function array (a) {
+  return Uint8Array.from(atob(a), a => a.charCodeAt())
+}
+
+function string (a) {
+  return btoa(String.fromCharCode(...a))
+}
+
+function random (bytes=1) {
+  return crypto.getRandomValues(new Uint8Array(bytes))
+}
+
+function random_string (chars=1) {
+  return string(random((chars + 1) * 0.75)).slice(0, chars)
+}
+
+function blob (a) {
+  return new Blob([a])
+}
+
+function file_reader () {
+  return new FileReader()
+}
+
+function promise (a) {
+  return new Promise(a)
+}
+
+function base (a) {
+  return promise(resolve => {
+    const b = file_reader()
+    b.onloadend = a => resolve(b.result.slice(37))
+    b.readAsDataURL(blob(a))
+  })
+}
+
+function sabe (a) {
+  return promise(resolve => {
+    const b = file_reader()
+    b.onloadend = a => resolve(b.result)
+    b.readAsText(blob(a))
+  })
+}
+
+async function encrypt (patch) {
+  patch = array(await base(JSON.stringify(patch)))
+  const length = len(patch)
+  const rand = random(length)
+  for (let i = 0; i < length; i++) {
+    patch[i] ^= rand[i]
+  }
+  return [string(patch), string(rand)]
+}
+
+async function decrypt (patch, rand) {
+  patch = array(patch)
+  rand = array(rand)
+  for (let i = 0, length = len(patch); i < length; i++) {
+    patch[i] ^= rand[i]
+  }
+  return JSON.parse(await sabe(patch))
 }
 
 function cache () {
@@ -642,9 +701,9 @@ function cache () {
     return window.indexedDB || window.mozIndexedDB || window.msIndexedDB || window.webkitIndexedDB
   }
 
-  async function open () {
+  function open () {
     if (this.c) return
-    return new Promise(resolve => {
+    return promise(resolve => {
       const request = indexed_db().open(empty, 1)
       request.onerror = error => {
         console.error(error, 'not open')
@@ -652,7 +711,7 @@ function cache () {
       }
       request.onsuccess = function () {
         this.c = c = request.result
-        c.onversionchange = function () { if (c) c.close() }
+        c.onversionchange = () => { if (c) c.close() }
         resolve(truee)
       }
       request.onupgradeneeded = function () {
@@ -668,8 +727,8 @@ function cache () {
     return event.target.result
   }
 
-  async function get (store, name) {
-    return new Promise(resolve => {
+  function get (store, name) {
+    return promise(resolve => {
       try {
         const request = this.c.transaction(store, 'readonly').objectStore(store).get(name)
         request.onerror = error => resolve(falsee)
@@ -704,12 +763,12 @@ function cache () {
   }
 
   async function get_key (key) {
-    key = key[0] + random(6)
+    key = key[0] + random_string(4)
     return await get(b, key) ? get_key(key) : key
   }
 
-  async function delete_key (store, key) {
-    return new Promise(resolve => {
+  function delete_key (store, key) {
+    return promise(resolve => {
       try {
         const request = this.c.transaction(store, rw).objectStore(store).delete(key)
         request.onerror = error => resolve(falsee)
@@ -732,12 +791,12 @@ function cache () {
     return split.slice(0, -1)
   }
 
-  function last (string) {
-    return string.slice(-1)[0]
-  }
-
   function parent (name) {
     return join(slice(separate(name, slash)), slash)
+  }
+
+  function last (string) {
+    return string.slice(-1)[0]
   }
 
   async function update_parent (name, filter=truee) {
@@ -782,8 +841,8 @@ function cache () {
     return falsee
   }
 
-  async function delete_database (db, d) {
-    return new Promise(resolve => {
+  function delete_database (db, d) {
+    return promise(resolve => {
       const request = db.deleteDatabase(d.name)
       request.onerror = error => resolve(falsee)
       request.onsuccess = event => resolve(truee)
@@ -800,8 +859,46 @@ function cache () {
     return deleted
   }
 
-  function length (file) {
-    return new Blob([file]).size
+  function length (value) {
+    let total = 0, type = typeof value
+    if (type == 'string') {
+      total += len(value) * 2
+    } else if (type == 'boolean') {
+      total += 4
+    } else if (type == 'number') {
+      total += 8
+    } else if (type == 'bigint') {
+      total += 24
+    } else if (type == 'symbol') {
+      total += len(value.toString()) * 2
+    } else if (!value) {
+      total += 2
+    } else if (ArrayBuffer.isView(value)) {
+      total += value.byteLength + 32
+    } else if (value instanceof Array) {
+      total += array_length(value) + 32
+    } else if (type == 'object' && value) {
+      total += object_length(value) + 56
+    } else {
+      total += 16
+    }
+    return total
+  }
+
+  function array_length (array) {
+    let value, total = 0
+    for (value of array) {
+      total += length(value)
+    }
+    return total
+  }
+
+  function object_length (object) {
+    let key, total = 0
+    for (key in object) {
+      total += length(key) + length(object[key])
+    }
+    return total
   }
 
   function update (name, used, space) {
@@ -817,14 +914,14 @@ function cache () {
     if (first) used[name] = 0
     const key = await get(a, name)
     const files = await get(b, key)
-    const name_length = len(name) + len(key) * 2
+    const name_length = length(name) + length(key) * 2
     if (key[0] == b) {
       return update(name, used, name_length + length(files))
     } else {
       if (len(files) == 0) {
         return update(name, used, name_length + 1)
       } else {
-        used = await update(name, used, name_length + files ? files.reduce((a, b) => a + len(b), 0) : 0 + 1)
+        used = await update(name, used, name_length + length(files))
         name += slash
         for (let i = 0, file, length = len(files); i < length; i++) {
           file = name + files[i]
@@ -836,24 +933,27 @@ function cache () {
     }
   }
 
+  function min (a, b) {
+    return a < b ? a : b
+  }
+
   this.available = async function (length) {
     const {usage, quota} = await navigator.storage.estimate()
-    const free_space = Math.min(quota * 0.2, 2147483648) - usage
+    const free = min(quota * 0.2, 2147483648) - usage
     if (length) {
-      const past = 10485761 + length - free_space
+      const past = 10485761 + length - free
       if (past > 0) {
         console.error(past, 'bytes past limit')
         return falsee
       } else {
         return truee
       }
-    } else {
-      return free_space
     }
+    return free
   }
 
   function put (store, key, value) {
-    return new Promise(resolve => {
+    return promise(resolve => {
       try {
         const request = this.c.transaction(store, rw).objectStore(store).put(key, value)
         request.onerror = error => {
@@ -878,7 +978,7 @@ function cache () {
       if (!force) return truee
       name = await duplicate(name)
     }
-    if (!await this.available(len(name) * 2)) return falsee
+    if (!await this.available(length(name) * 2 + 20)) return falsee
     const split = separate(name, slash)
     for (let files, folder, i = 0, key, length = len(split), subfolder, subsplit; i < length; i++) {
       subfolder = join(split.slice(0, i + 1), slash)
@@ -895,7 +995,7 @@ function cache () {
         await add(subfolder, key, [])
       }
     }
-    return truee
+    return name
   }
 
   async function duplicate (name, dup=0) {
@@ -914,7 +1014,7 @@ function cache () {
 
   this.write = async function (name, blob) {
     await open()
-    if (!await this.available(len(name) * 2 + length(blob))) return falsee
+    if (!await this.available(length(blob) + length(name) * 2 + 20)) return falsee
     const folder = parent(name)
     name = await duplicate(name)
     let key = await get_key(b)
@@ -926,7 +1026,8 @@ function cache () {
     }
     const files = await this.read(folder) || []
     files.push(last(separate(name, slash)))
-    return add(folder, key, files)
+    await add(folder, key, files)
+    return name
   }
 
   this._move = async function (src, dst, file, move) {
@@ -942,7 +1043,9 @@ function cache () {
   }
 
   function overlap (a, b) {
-    return len(b) == 0 ? empty : (a.endsWith(b) || a.indexOf(b) >= 0) ? b : overlap(a, b.substring(0, len(b) - 1))
+    let i = 0, length = len(a)
+    while (i < length && a[i] == b[i]) i++
+    return a.slice(0, i)
   }
 
   this._copy = async function (src, dst, move) {
@@ -1042,20 +1145,52 @@ function bcdiff (past, next) {
     return falsee
   }
 
-  let buffer = [], i = 0, length = len(past), match, pos
+  function check (list, sublist, y) {
+    if (len(sublist) == 0) return y
+    for (let a = sublist[0], i = 0, length = len(list), sublength = len(sublist); i < length; i++) {
+      if (list[i] === a) return check(list.slice(i + 1, i + sublength), sublist.slice(1), y ? y : i)
+    }
+    return -1
+  }
+
+  let buffer = [], buffer_length, i = 0, length = len(past), match, pos
   while (i < length) {
     match = matches(tree, past.slice(i))
     if (match) {
-      if (len(buffer) && patch.push(buffer)) buffer = []
+      buffer_length = len(buffer)
+      if (buffer_length) {
+        pos = check(next, buffer)
+        if (pos) {
+          patch.push(pos, buffer_length)
+        } else {
+          pos = check(patch, buffer)
+          if (pos) {
+            patch.push('b', pos, buffer_length)
+          } else {
+            patch.push('a', buffer_length, ...buffer)
+          }
+        }
+        buffer = []
+      }
       pos = match[0]
       match = match[1]
-      patch.push(pos, pos + match)
+      patch.push(pos, match)
       i += match
     } else {
       buffer.push(past[i++])
     }
   }
   if (len(buffer)) patch.push(buffer)
+  for (i = 0; i < patch.length; i++) {
+    if (patch[i] == 'a') {
+      length = patch[++i]
+      if (length > 2) {
+        buffer = patch.slice(++i, i + length)
+        pos = check(patch.slice(i + length), buffer)
+        if (pos) patch.splice()
+      }
+    }
+  }
   return patch
 }
 
@@ -1063,10 +1198,14 @@ function bcpatch (last, patch) {
   let diff, i = 0, length = len(patch), past = []
   while (i < length) {
     diff = patch[i++]
-    if (diff instanceof Array) {
-      past.push(...diff)
-    } else if (typeof diff == 'number') {
-      past.push(...last.slice(diff, patch[i++]))
+    if (typeof diff == 'number') {
+      past.push(...last.slice(diff, diff + patch[i++]))
+    } else if (diff == 'a') {
+      diff = patch[i++]
+      past.push(...patch.slice(i, i += diff))
+    } else if (diff == 'b') {
+      past.push(...patch.slice(patch[i], patch[i++] + patch[i++]))
+    } else if (diff == 'c') {
     }
   }
   return past
