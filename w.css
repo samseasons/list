@@ -2,9 +2,9 @@
   --a: gray;
   --b: black;
   --c: white;
+  --t: transparent;
 }
 body {
   background-color: var(--b);
   color: var(--a);
-  height: 100%;
 }
