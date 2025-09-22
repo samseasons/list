@@ -1,4 +1,4 @@
-import { html } from './choo'
+import { html } from 'choo'
 
 export function process (state, relay) {
   relay.b('change', function (a1, a2) {

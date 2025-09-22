@@ -1,4 +1,4 @@
-import { empty, falsee, len } from './choo'
+import { empty, falsee, len } from 'choo'
 
 function bcdiff (past, next) {
   if (typeof next == 'string') next = next.split(empty)
