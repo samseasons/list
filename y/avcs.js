@@ -65,53 +65,90 @@ function bcdiff (past, next) {
     return falsee
   }
 
-  function check (list, sublist, y) {
-    if (len(sublist) == 0) return y
+  function check (list, sublist, j=0) {
+    if (len(sublist) == 0) return j
     for (let a = sublist[0], i = 0, length = len(list), sublength = len(sublist); i < length; i++) {
-      if (list[i] === a) return check(list.slice(i + 1, i + sublength), sublist.slice(1), y ? y : i)
+      if (list[i] === a) return check(list.slice(i + 1, i + sublength), sublist.slice(1), j ? j : i)
     }
     return -1
   }
 
-  let buffer = [], buffer_length, i = 0, length = len(past), match, pos
+  let buffer = [], i = 0, l, length = len(past), match, p, q = 0, r = []
   while (i < length) {
     match = matches(tree, past.slice(i))
     if (match) {
-      buffer_length = len(buffer)
-      if (buffer_length) {
-        pos = check(next, buffer)
-        if (pos) {
-          patch.push(pos, buffer_length)
+      l = len(buffer)
+      if (l) {
+        p = check(next, buffer)
+        if (p > -1) {
+          patch.push(p, l)
+          r.push(q += 2)
         } else {
-          pos = check(patch, buffer)
-          if (pos) {
-            patch.push('b', pos, buffer_length)
-          } else {
-            patch.push('a', buffer_length, ...buffer)
-          }
+          patch.push('a', l, ...buffer)
+          r.push(q += 2 + len(buffer))
         }
         buffer = []
       }
-      pos = match[0]
+      p = match[0]
       match = match[1]
-      patch.push(pos, match)
+      patch.push(p, match)
+      r.push(q += 2)
       i += match
     } else {
       buffer.push(past[i++])
     }
   }
-  if (len(buffer)) patch.push(buffer)
-  for (i = 0; i < patch.length; i++) {
+  l = len(buffer)
+  if (l) {
+    patch.push('a', l, ...buffer)
+    r.push(q += 2 + len(buffer))
+  }
+  let b, bs = {}, j, k = [], m
+  for (i of r) {
     if (patch[i] == 'a') {
-      length = patch[++i]
-      if (length > 2) {
-        buffer = patch.slice(++i, i + length)
-        pos = check(patch.slice(i + length), buffer)
-        if (pos) patch.splice()
+      b = patch.slice(i + 2, i + 2 + patch[i + 1])
+      l = len(b)
+      k = []
+      while ((j = patch.indexOf(b[0], j + 1)) != -1) {
+        if (patch.slice(j, j + l).toString() == b.toString()) {
+          k.push(j)
+        }
+      }
+      l = -1, m = -1
+      for (j of k) {
+        if (patch[j - 1] > l || i == j && patch[j - 1] == l) {
+          l = patch[j - 1]
+          m = j
+        }
+      }
+      if (m >= 0 && m != i + 2) {
+        bs[i] = [m, patch[i + 1]]
       }
     }
   }
-  return patch
+  let cs = {}, ds = []
+  i = 0, j = 0, length = len(patch), r = []
+  while (i < length) {
+    cs[i] = j
+    if (i in bs) {
+      buffer = ['b', ...bs[i]]
+      ds.push(i)
+      i += len(patch.slice(i, i + 2 + patch[i + 1]))
+    } else {
+      if (patch[i] == 'a') {
+        buffer = patch.slice(i, i + 2 + patch[i + 1])
+      } else {
+        buffer = patch.slice(i, i + 2)
+      }
+      i += len(buffer)
+    }
+    j += len(buffer)
+    r.push(...buffer)
+  }
+  for (d of ds) {
+    r[cs[d] + 1] = cs[r[cs[d] + 1] - 2] + 2
+  }
+  return r
 }
 
 function bcpatch (last, patch) {

@@ -693,9 +693,8 @@ async function decrypt (patch, rand) {
 function cache () {
   const a = 'a', b = 'b', dot = '.', rw = 'readwrite', slash = '/', spa = ' ('
 
-  window.IDBKeyRange = window.IDBKeyRange || window.msIDBKeyRange || window.webkitIDBKeyRange
-  window.IDBTransaction = window.IDBTransaction || window.msIDBTransaction || window.webkitIDBTransaction
-    || { READ_WRITE: rw }
+  window.IDBKeyRange ||= window.msIDBKeyRange || window.webkitIDBKeyRange
+  window.IDBTransaction ||= window.msIDBTransaction || window.webkitIDBTransaction || { READ_WRITE: rw }
 
   function indexed_db () {
     return window.indexedDB || window.mozIndexedDB || window.msIndexedDB || window.webkitIndexedDB
@@ -764,7 +763,7 @@ function cache () {
 
   async function get_key (key) {
     key = key[0] + random_string(4)
-    return await get(b, key) ? get_key(key) : key
+    return await get(b, key) ? await get_key(key) : key
   }
 
   function delete_key (store, key) {
@@ -779,29 +778,29 @@ function cache () {
     })
   }
 
-  function join (split, separator) {
-    return split.join(separator)
+  function join (list, separator) {
+    return list.join(separator)
   }
 
-  function separate (name, separator) {
-    return name.split(separator)
-  }
-
-  function slice (split) {
-    return split.slice(0, -1)
-  }
-
-  function parent (name) {
-    return join(slice(separate(name, slash)), slash)
+  function split (string, separator) {
+    return string.split(separator)
   }
 
   function last (string) {
     return string.slice(-1)[0]
   }
 
+  function slice (string) {
+    return string.slice(0, -1)
+  }
+
+  function parent (string) {
+    return join(slice(split(string, slash)), slash)
+  }
+
   async function update_parent (name, filter=truee) {
     const folder = parent(name)
-    name = last(separate(name, slash))
+    name = last(split(name, slash))
     const key = await get(a, folder)
     if (key) {
       let files = await get(b, key) || []
@@ -813,15 +812,14 @@ function cache () {
   async function delete_file (key, name) {
     await delete_key(a, name)
     await delete_key(b, key)
-    if (len(separate(name, slash)) < 2) return truee
+    if (len(split(name, slash)) < 2) return truee
     return await update_parent(name)
   }
 
   this.delete_file = async function (name) {
     await open()
     const key = await get(a, name)
-    if (key && key[0] == b) delete_file(key, name)
-    return falsee
+    return (key && key[0] == b) ? await delete_file(key, name) : falsee
   }
 
   this.delete_folder = async function (name) {
@@ -841,48 +839,51 @@ function cache () {
     return falsee
   }
 
-  function delete_database (db, d) {
+  function delete_database (d) {
     return promise(resolve => {
-      const request = db.deleteDatabase(d.name)
+      const request = this.c.deleteDatabase(d)
       request.onerror = error => resolve(falsee)
       request.onsuccess = event => resolve(truee)
     })
   }
 
   this.delete_stores = async function () {
-    const db = indexed_db()
-    const dbs = await db.databases()
+    await open()
+    await this.c.transaction(a, rw).objectStore(a).clear()
+    await this.c.transaction(b, rw).objectStore(b).clear()
+    const dbs = await this.c.databases()
     let deleted = truee
     for (let i = 0, length = len(dbs); i < length; i++) {
-      deleted = await delete_database(db, dbs[i]) && deleted
+      deleted = await delete_database(dbs[i].name) && deleted
     }
     return deleted
   }
 
   function length (value) {
-    let total = 0, type = typeof value
-    if (type == 'string') {
-      total += len(value) * 2
-    } else if (type == 'boolean') {
-      total += 4
+    const type = typeof value
+    if (type == 'boolean') {
+      return 4
     } else if (type == 'number') {
-      total += 8
+      return 8
     } else if (type == 'bigint') {
-      total += 24
+      return 24
+    } else if (type == 'string') {
+      return len(value) * 2
+    } else if (type == 'function') {
+      return len(value.toString()) * 2
     } else if (type == 'symbol') {
-      total += len(value.toString()) * 2
-    } else if (!value) {
-      total += 2
+      return len(value.toString()) * 2
     } else if (ArrayBuffer.isView(value)) {
-      total += value.byteLength + 32
+      return value.byteLength + 32
     } else if (value instanceof Array) {
-      total += array_length(value) + 32
-    } else if (type == 'object' && value) {
-      total += object_length(value) + 56
+      return array_length(value) + 32
+    } else if (type == 'object') {
+      return object_length(value) + 56
+    } else if (!value) {
+      return 4
     } else {
-      total += 16
+      return 64
     }
-    return total
   }
 
   function array_length (array) {
@@ -921,7 +922,7 @@ function cache () {
       if (len(files) == 0) {
         return update(name, used, name_length + 1)
       } else {
-        used = await update(name, used, name_length + length(files))
+        used = update(name, used, name_length + length(files))
         name += slash
         for (let i = 0, file, length = len(files); i < length; i++) {
           file = name + files[i]
@@ -939,7 +940,7 @@ function cache () {
 
   this.available = async function (length) {
     const {usage, quota} = await navigator.storage.estimate()
-    const free = min(quota * 0.2, 2147483648) - usage
+    const free = min(quota / 5) - usage
     if (length) {
       const past = 10485761 + length - free
       if (past > 0) {
@@ -955,7 +956,7 @@ function cache () {
   function put (store, key, value) {
     return promise(resolve => {
       try {
-        const request = this.c.transaction(store, rw).objectStore(store).put(key, value)
+        const request = this.c.transaction(store, rw).objectStore(store).put(value, key)
         request.onerror = error => {
           console.error(error, key, value)
           resolve(falsee)
@@ -968,22 +969,22 @@ function cache () {
   }
 
   async function add (name, key, value) {
-    const result = await put(a, key, name)
-    return await put(b, value, key) && result || falsee
+    const result = await put(a, name, key)
+    return await put(b, key, value) && result || falsee
   }
 
-  this.mkdir = async function (name, force=truee) {
+  this.mkdir = async function (name, force=falsee) {
     await open()
     if (await this.exists(name)) {
       if (!force) return truee
       name = await duplicate(name)
     }
     if (!await this.available(length(name) * 2 + 20)) return falsee
-    const split = separate(name, slash)
-    for (let files, folder, i = 0, key, length = len(split), subfolder, subsplit; i < length; i++) {
-      subfolder = join(split.slice(0, i + 1), slash)
+    const names = split(name, slash)
+    for (let files, folder, i = 0, key, length = len(names), subfolder, subsplit; i < length; i++) {
+      subfolder = join(names.slice(0, i + 1), slash)
       if (!await get(a, subfolder)) {
-        subsplit = separate(subfolder, slash)
+        subsplit = split(subfolder, slash)
         if (len(subsplit) > 1) {
           folder = join(slice(subsplit), slash)
           files = await this.read(folder) || []
@@ -1000,14 +1001,14 @@ function cache () {
 
   async function duplicate (name, dup=0) {
     if (!await get(a, name)) return name
-    let close = ')', split = separate(name, slash)
-    let file = last(split), folder = join(slice(split), slash)
-    split = separate(file, dot)
-    if (len(split) > 1) {
-      close += dot + split.slice(-1)
-      file = join(slice(split), dot)
+    let close = ')', names = split(name, slash)
+    let file = last(names), folder = join(slice(names), slash)
+    names = split(file, dot)
+    if (len(names) > 1) {
+      close += dot + names.slice(-1)
+      file = join(slice(names), dot)
     }
-    const pre = separate(file, spa)
+    const pre = split(file, spa)
     name = folder + slash + (len(pre) > 1 ? join(slice(pre), spa) : file) + spa + dup + close
     return await duplicate(name, dup + 1)
   }
@@ -1025,7 +1026,7 @@ function cache () {
       key = await get_key(b)
     }
     const files = await this.read(folder) || []
-    files.push(last(separate(name, slash)))
+    files.push(last(split(name, slash)))
     await add(folder, key, files)
     return name
   }
@@ -1034,7 +1035,7 @@ function cache () {
     const src_key = await get(a, src)
     await update_parent(dst, falsee)
     if (move) {
-      return await put(a, dst, src_key) && await delete_key(a, src)
+      return await put(a, src_key, dst) && await delete_key(a, src)
     } else {
       const key = await get_key(file ? b : a)
       const content = await get(b, src_key)
@@ -1050,9 +1051,10 @@ function cache () {
 
   this._copy = async function (src, dst, move) {
     const base = overlap(src, dst)
-    const dst_base = separate(dst, base)[1], src_base = separate(src, base)[1]
+    const dst_base = split(dst, base)[1]
+    const src_base = split(src, base)[1]
     const files = await this.read(src)
-    await files.forEach(async f => { await this.copy(f, base + dst_base + separate(f, src_base)[1], falsee, move) })
+    await files.forEach(async f => { await this.copy(f, base + dst_base + split(f, src_base)[1], falsee, move) })
   }
 
   this.copy = async function (src, dst, merge=falsee, move=falsee) {
@@ -1074,8 +1076,8 @@ function cache () {
   }
 
   this.move = async function (src, dst, merge=falsee) {
-    return this.copy(src, dst, merge, truee)
+    return await this.copy(src, dst, merge, truee)
   }
 }
 
-export const cache = new cache()
+export default cache = new cache()
