@@ -782,16 +782,16 @@ function cache () {
     return list.join(separator)
   }
 
-  function split (string, separator) {
-    return string.split(separator)
-  }
-
-  function last (string) {
-    return string.slice(-1)[0]
+  function last (list) {
+    return list.slice(-1)[0]
   }
 
   function slice (string) {
     return string.slice(0, -1)
+  }
+
+  function split (string, separator) {
+    return string.split(separator)
   }
 
   function parent (string) {
@@ -915,14 +915,14 @@ function cache () {
     if (first) used[name] = 0
     const key = await get(a, name)
     const files = await get(b, key)
-    const name_length = length(name) + length(key) * 2
+    const l = length(name) + length(key) * 2
     if (key[0] == b) {
-      return update(name, used, name_length + length(files))
+      return update(name, used, l + length(files))
     } else {
       if (len(files) == 0) {
-        return update(name, used, name_length + 1)
+        return update(name, used, l + 1)
       } else {
-        used = update(name, used, name_length + length(files))
+        used = update(name, used, l + length(files))
         name += slash
         for (let i = 0, file, length = len(files); i < length; i++) {
           file = name + files[i]
@@ -934,15 +934,11 @@ function cache () {
     }
   }
 
-  function min (a, b) {
-    return a < b ? a : b
-  }
-
   this.available = async function (length) {
     const {usage, quota} = await navigator.storage.estimate()
-    const free = min(quota / 5) - usage
+    const free = quota / 10 - usage
     if (length) {
-      const past = 10485761 + length - free
+      const past = length - free
       if (past > 0) {
         console.error(past, 'bytes past limit')
         return falsee
@@ -1013,13 +1009,20 @@ function cache () {
     return await duplicate(name, dup + 1)
   }
 
-  this.write = async function (name, blob) {
+  this.write = async function (name, blob, keep=falsee) {
     await open()
     if (!await this.available(length(blob) + length(name) * 2 + 20)) return falsee
-    const folder = parent(name)
-    name = await duplicate(name)
+    const exists = await this.exists(name)
+    if (exists) {
+      if (keep) {
+        name = await duplicate(name)
+      } else {
+        return await put(b, exists, blob)
+      }
+    }
     let key = await get_key(b)
     if (!await add(name, key, blob)) return falsee
+    const folder = parent(name)
     key = await get(a, folder)
     if (!key) {
       if (!await this.mkdir(folder)) return falsee
@@ -1059,7 +1062,7 @@ function cache () {
 
   this.copy = async function (src, dst, merge=falsee, move=falsee) {
     await open()
-    if (!move && !await this.available((await this.space(src))[src])) return falsee
+    if (!move && !await this.available((await this.space(src))[src] + 20)) return falsee
     const found = await this.read(dst)
     if (found && !merge) dst = await duplicate(dst)
     if (await this.is_file(src)) {
@@ -1080,4 +1083,4 @@ function cache () {
   }
 }
 
-export default cache = new cache()
+export const cache = new cache()

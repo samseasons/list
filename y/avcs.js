@@ -18,29 +18,28 @@ function bcdiff (past, next) {
       }
       return leaves
     } else if (typeof leaf == 'object') {
-      leaf[a] = a in leaf ? trie(i, j, kf, leaf[a]) : i
+      leaf[a] = a in leaf ? trie(i, leaf[a], kf, leaf[a]) : i
       return leaf
     }
   }
 
-  const patch = [], tree = {}
-  for (let a, b, branch, i = 0, length = len(next); i < length; i++) {
+  const tree = {}
+  for (let a, b, branch, i = 0, leaf, length = len(next); i < length; i++) {
     a = next[i]
     b = next[i + 1]
     if (a in tree) {
       branch = tree[a]
       if (b in branch) {
         leaf = branch[b]
-        branch[b] = trie(i, leaf, i, leaf)[b]
+        branch[b] = {...trie(i, leaf, i, leaf)[b], ...leaf}
       } else {
         branch[b] = i
-        tree[a] = branch
       }
     } else {
       branch = {}
       branch[b] = i
-      tree[a] = branch
     }
+    tree[a] = branch
   }
 
   function overlaps (a, b) {
@@ -73,15 +72,15 @@ function bcdiff (past, next) {
     return -1
   }
 
-  let buffer = [], i = 0, l, length = len(past), match, p, q = 0, r = []
+  let buffer = [], i = 0, l, length = len(past), match, patch = [], pos, q = 0, r = []
   while (i < length) {
     match = matches(tree, past.slice(i))
     if (match) {
       l = len(buffer)
       if (l) {
-        p = check(next, buffer)
-        if (p > -1) {
-          patch.push(p, l)
+        pos = check(next, buffer)
+        if (pos > -1) {
+          patch.push(pos, l)
           r.push(q += 2)
         } else {
           patch.push('a', l, ...buffer)
@@ -89,9 +88,9 @@ function bcdiff (past, next) {
         }
         buffer = []
       }
-      p = match[0]
+      pos = match[0]
       match = match[1]
-      patch.push(p, match)
+      patch.push(pos, match)
       r.push(q += 2)
       i += match
     } else {
@@ -103,16 +102,14 @@ function bcdiff (past, next) {
     patch.push('a', l, ...buffer)
     r.push(q += 2 + len(buffer))
   }
-  let b, bs = {}, j, k = [], m
+  let bs = {}, j, k = [], m
   for (i of r) {
     if (patch[i] == 'a') {
-      b = patch.slice(i + 2, i + 2 + patch[i + 1])
-      l = len(b)
+      buffer = patch.slice(i + 2, i + 2 + patch[i + 1])
+      l = len(buffer)
       k = []
-      while ((j = patch.indexOf(b[0], j + 1)) != -1) {
-        if (patch.slice(j, j + l).toString() == b.toString()) {
-          k.push(j)
-        }
+      while ((j = patch.indexOf(buffer[0], j + 1)) != -1) {
+        if (patch.slice(j, j + l).toString() == buffer.toString()) k.push(j)
       }
       l = -1, m = -1
       for (j of k) {
@@ -121,17 +118,15 @@ function bcdiff (past, next) {
           m = j
         }
       }
-      if (m >= 0 && m != i + 2) {
-        bs[i] = [m, patch[i + 1]]
-      }
+      if (m >= 0 && m != i + 2) bs[i] = [m, patch[i + 1]]
     }
   }
   let cs = {}, ds = []
   i = 0, j = 0, length = len(patch), r = []
   while (i < length) {
-    cs[i] = j
+    cs[i] = j + 1
     if (i in bs) {
-      buffer = ['b', ...bs[i]]
+      buffer = ['b', bs[0], bs[1]]
       ds.push(i)
       i += len(patch.slice(i, i + 2 + patch[i + 1]))
     } else {
@@ -146,13 +141,14 @@ function bcdiff (past, next) {
     r.push(...buffer)
   }
   for (d of ds) {
-    r[cs[d] + 1] = cs[r[cs[d] + 1] - 2] + 2
+    r[cs[d]] = cs[r[cs[d]] - 2] + 1
   }
   return r
 }
 
 function bcpatch (last, patch) {
   let diff, i = 0, length = len(patch), past = []
+  if (length == 1) return [...last.slice(patch[0])]
   while (i < length) {
     diff = patch[i++]
     if (typeof diff == 'number') {
@@ -161,7 +157,8 @@ function bcpatch (last, patch) {
       diff = patch[i++]
       past.push(...patch.slice(i, i += diff))
     } else if (diff == 'b') {
-      past.push(...patch.slice(patch[i], patch[i++] + patch[i++]))
+      diff = patch[i++]
+      past.push(...patch.slice(diff, diff + patch[i++]))
     } else if (diff == 'c') {
     }
   }
