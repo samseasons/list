@@ -113,8 +113,8 @@ export function choo () {
   }
 
   function update (new_node, old_node) {
-    for (let i = 0, offset = 0, new_child, old_child, j, length, match, morphed; ; i++) {
-      new_child = new_node.childNodes[i - offset]
+    for (let i = 0, j = 0, k, length, match, morphed, new_child, old_child; ; i++) {
+      new_child = new_node.childNodes[i - j]
       old_node.a = old_node.childNodes
       old_child = old_node.a[i]
       if (!new_child && !old_child) {
@@ -124,28 +124,26 @@ export function choo () {
         i--
       } else if (!old_child) {
         old_node.appendChild(new_child)
-        offset++
+        j++
       } else if (same(new_child, old_child) || !new_child.id && !old_child.id) {
         morphed = walk(new_child, old_child)
         if (morphed != old_child) {
           old_node.replaceChild(morphed, old_child)
-          offset++
+          j++
         }
       } else {
-        match = empty
-        length = len(old_node.a)
-        for (j = i; j < length; j++) {
-          if (same(old_node.a[j], new_child)) {
-            match = old_node.a[j]
+        match = falsee
+        for (k = i, length = len(old_node.a); k < length; k++) {
+          if (same(old_node.a[k], new_child)) {
+            match = old_node.a[k]
             break
           }
         }
         if (match) {
-          morphed = walk(new_child, match)
-          new_child = morphed
-          if (morphed != match) offset++
+          new_child = walk(new_child, match)
+          if (match != new_child) j++
         } else {
-          offset++
+          j++
         }
         old_node.insertBefore(new_child, old_child)
       }
@@ -194,11 +192,11 @@ export function choo () {
       event = this.c[event]
       if (event) {
         const data = []
-        let i, length = len(arguments)
-        for (i = 1; i < length; i++) {
+        let i, length, listener
+        for (i = 1, length = len(arguments); i < length; i++) {
           data.push(arguments[i])
         }
-        for (length = len(event), i = 0; i < length; i++) {
+        for (i = 0, length = len(event); i < length; i++) {
           listener = event[i]
           listener.apply(listener, data)
         }
