@@ -21,10 +21,10 @@ export function choo () {
     node.setAttribute(name, value)
   }
 
-  function morph_attribute (new_node, old_node, name) {
-    if (new_node[name] != old_node[name]) {
-      old_node[name] = new_node[name]
-      new_node[name] ? set_attribute(old_node, name, empty) : remove_attribute(old_node, name)
+  function morph_attribute (next, past, name) {
+    if (next[name] != past[name]) {
+      past[name] = next[name]
+      next[name] ? set_attribute(past, name, empty) : remove_attribute(past, name)
     }
   }
 
@@ -32,31 +32,32 @@ export function choo () {
     return node.hasAttributeNS(name, value)
   }
 
-  function morph_input (new_node, old_node) {
-    const new_value = value(new_node), old_value = value(old_node)
-    morph_attribute(new_node, old_node, 'checked')
-    morph_attribute(new_node, old_node, 'disabled')
-    if (new_value != old_value || old_node.type == 'range') set_attribute(old_node, v, new_value)
-    if (new_value == empty || !has_attribute_ns(new_node, empty, v)) remove_attribute(old_node, v)
+  function morph_input (next, past) {
+    const next_value = value(next), past_value = value(past)
+    morph_attribute(next, past, 'checked')
+    morph_attribute(next, past, 'disabled')
+    if (next_value != past_value || past.type == 'range') set_attribute(past, v, next_value)
+    if (next_value == empty || !has_attribute_ns(next, empty, v)) remove_attribute(past, v)
   }
 
   function node_value (node) {
     return node.nodeValue
   }
 
-  function morph_textarea (new_node, old_node) {
-    const new_value = value(new_node)
-    if (new_value != value(old_node)) {
-      old_node.value = new_value
-      const child = old_node.firstChild
-      if (child && node_value(child) != new_value && !(new_value == empty && node_value(child) == old_node.placeholder)) {
-        child.nodeValue = new_value
+  function morph_textarea (next, past) {
+    next = value(next)
+    if (next != value(past)) {
+      past.value = next
+      const child = past.firstChild
+      if (child && node_value(child) != next && !(next == empty && node_value(child) == past.placeholder)) {
+        child.nodeValue = next
       }
     }
   }
+  
 
-  function replace_attributes (new_node, old_node) {
-    let attr, attrs = new_node.attributes, i, name, namespace, val
+  function replace_attributes (next, past) {
+    let attr, attrs = next.attributes, i, name, namespace, val
     for (i = len(attrs); i--;) {
       attr = attrs[i]
       name = attr.name
@@ -64,18 +65,18 @@ export function choo () {
       val = value(attr)
       if (namespace) {
         name = attr.localName || name
-        if (old_node.getAttributeNS(namespace, name) != val) old_node.setAttributeNS(namespace, name, val)
+        if (past.getAttributeNS(namespace, name) != val) past.setAttributeNS(namespace, name, val)
       } else {
-        if (old_node.hasAttribute(name)) {
-          if (old_node.getAttribute(name) != val) {
-            val == empty ? remove_attribute(old_node, name) : set_attribute(old_node, name, val)
+        if (past.hasAttribute(name)) {
+          if (past.getAttribute(name) != val) {
+            val == empty ? remove_attribute(past, name) : set_attribute(past, name, val)
           }
         } else {
-          set_attribute(old_node, name, val)
+          set_attribute(past, name, val)
         }
       }
     }
-    attrs = old_node.attributes
+    attrs = past.attributes
     for (i = len(attrs); i--;) {
       attr = attrs[i]
       if (attr.specified) {
@@ -83,90 +84,90 @@ export function choo () {
         namespace = attr.namespaceURI
         if (namespace) {
           name = attr.localName || name
-          if (!has_attribute_ns(new_node, namespace, name)) old_node.removeAttributeNS(namespace, name)
-        } else if (!has_attribute_ns(new_node, empty, name)) {
-          remove_attribute(old_node, name)
+          if (!has_attribute_ns(next, namespace, name)) past.removeAttributeNS(namespace, name)
+        } else if (!has_attribute_ns(next, empty, name)) {
+          remove_attribute(past, name)
         }
       }
     }
   }
 
-  function morph (new_node, old_node) {
-    const new_type = new_node.nodeType, new_name = new_node.nodeName, new_value = node_value(new_node)
-    if (new_type == 1) {
-      replace_attributes(new_node, old_node)
-    } else if (new_type == 3 || new_type == 8) {
-      old_node.nodeValue = new_value
+  function morph (next, past) {
+    const next_type = next.nodeType, next_name = next.nodeName, next_value = node_value(next)
+    if (next_type == 1) {
+      replace_attributes(next, past)
+    } else if (next_type == 3 || next_type == 8) {
+      past.nodeValue = next_value
     }
-    if (new_name == 'INPUT') {
-      morph_input(new_node, old_node)
-    } else if (new_name == 'OPTION') {
-      morph_attribute(new_node, old_node, 'selected')
-    } else if (new_name == 'TEXTAREA') {
-      morph_textarea(new_node, old_node)
+    if (next_name == 'INPUT') {
+      morph_input(next, past)
+    } else if (next_name == 'OPTION') {
+      morph_attribute(next, past, 'selected')
+    } else if (next_name == 'TEXTAREA') {
+      morph_textarea(next, past)
     }
-    events.forEach(event => old_node[event] = new_node[event] ? new_node[event] : empty)
+    events.forEach(event => past[event] = next[event] ? next[event] : empty)
   }
 
   function same (a, b) {
     return a == b ? truee : a.id ? a.id == b.id : a.type == 3 ? node_value(a) == node_value(b) : falsee
   }
 
-  function update (new_node, old_node) {
-    for (let i = 0, j = 0, k, length, match, morphed, new_child, old_child; ; i++) {
-      new_child = new_node.childNodes[i - j]
-      old_node.a = old_node.childNodes
-      old_child = old_node.a[i]
-      if (!new_child && !old_child) {
+  function update (next, past) {
+    for (let i = 0, j = 0, k, length, match, morphed, nexts, pasts; ; i++) {
+      nexts = next.childNodes[i - j]
+      past.a = past.childNodes
+      pasts = past.a[i]
+      if (!nexts && !pasts) {
         break
-      } else if (!new_child) {
-        old_node.removeChild(old_child)
+      } else if (!nexts) {
+        past.removeChild(pasts)
         i--
-      } else if (!old_child) {
-        old_node.appendChild(new_child)
+      } else if (!pasts) {
+        past.appendChild(nexts)
         j++
-      } else if (same(new_child, old_child) || !new_child.id && !old_child.id) {
-        morphed = walk(new_child, old_child)
-        if (morphed != old_child) {
-          old_node.replaceChild(morphed, old_child)
+      } else if (same(nexts, pasts) || !nexts.id && !pasts.id) {
+        morphed = walk(nexts, pasts)
+        if (morphed != pasts) {
+          past.replaceChild(morphed, pasts)
           j++
         }
       } else {
         match = falsee
-        for (k = i, length = len(old_node.a); k < length; k++) {
-          if (same(old_node.a[k], new_child)) {
-            match = old_node.a[k]
+        for (k = i, length = len(past.a); k < length; k++) {
+          if (same(past.a[k], nexts)) {
+            match = past.a[k]
             break
           }
         }
         if (match) {
-          new_child = walk(new_child, match)
-          if (match != new_child) j++
+          nexts = walk(nexts, match)
+          if (match != nexts) j++
         } else {
           j++
         }
-        old_node.insertBefore(new_child, old_child)
+        past.insertBefore(nexts, pasts)
       }
     }
   }
 
-  function walk (new_node, old_node) {
-    if (new_node.f) {
-      old_node = new_node.f
-      new_node = new_node.d(new_node.e, new_node.b)
+  function walk (next, past) {
+    if (next.f) {
+      past = next.f
+      next = next.d(next.e, next.b)
     }
-    if (!old_node) {
-      return new_node
-    } else if (!new_node) {
+    if (!past) {
+      return next
+    } else if (!next) {
       return
-    } else if (new_node == old_node) {
-      return old_node
-    } else if (new_node.tagName != old_node.tagName) {
-      return new_node
+    } else if (next == past) {
+      return past
+    } else if (next.tagName != past.tagName) {
+      return next
     }
-    morph(new_node, old_node)
-    update(new_node, old_node)
-    return old_node
+    morph(next, past)
+    update(next, past)
+    return past
   }
 
   function traverse (node) {
@@ -247,20 +248,22 @@ export function choo () {
   }
 }
 
-function html (comments) {
+function chtml (comments) {
   const var_attr = 0, text_attr = 1, open_attr = 2, close_attr = 3, attr = 4, attr_key = 5, attr_key_w = 6,
-    attr_value_w = 7, attr_value = 8, attr_sq = 9, attr_dq = 10, attr_eq = 11, attr_break = 12, comment = 13,
-    end_hyphen = /-$/, forward_slash = /^\//, lead_line = /^\n[\s]+/, lead_space = /^[\s]+/,
-    multi_space = /[\n\s]+/g, not_whitespace = /[^\s"'=/]/, single_char_only = /\S/, start_comment = /^!--$/,
-    trail_line = /\n[\s]+$/, trail_space = /[\s]+$/, whitespace = /\s/,  whitespace_only = /^\s*$/,
-    word_or_hyphen = /[\w-]/, xmlns = /^xmlns($|:)/i, comment_tag = '!--', dq = '"', eq = '=', func = 'function',
-    obj = 'object', p = ' ', slash = '/', sq = "'", string = 'string', style = 'style', styles = '/style'
+      attr_value_w = 7, attr_value = 8, attr_sq = 9, attr_dq = 10, attr_eq = 11, attr_break = 12, comment = 13
+  const comment_tag = '!--', dq = '"', eq = '=', func = 'function', obj = 'object', p = ' ', slash = '/', sq = "'",
+      string = 'string'
+  const end_hyphen = /-$/, forward_slash = /^\//, lead_line = /^\n[\s]+/, lead_space = /^[\s]+/,
+      multi_space = /[\n\s]+/g, not_whitespace = /[^\s"'=/]/, single_char_only = /\S/, start_comment = /^!--$/,
+      trail_line = /\n[\s]+$/, trail_space = /[\s]+$/, whitespace = /\s/,  whitespace_only = /^\s*$/,
+      word_or_hyphen = /[\w-]/, xmlns = /^xmlns($|:)/i
   const bool_tags = ['autofocus', 'checked', 'defaultchecked', 'disabled', 'formnovalidate', 'indeterminate',
-    'readonly', 'required', 'selected', 'willvalidate'], code_tags = ['code', 'pre'], text_tags = ['a', 'abbr', 'b',
-    'bdi', 'bdo', 'br', 'cite', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rp', 'rt', 'rtc', 'ruby', 's', 'amp',
+    'readonly', 'required', 'selected', 'willvalidate'], code_tags = ['code', 'pre'], text_tags = ['a', 'amp', 'abbr',
+    'b', 'bdi', 'bdo', 'br', 'cite', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rp', 'rt', 'rtc', 'ruby', 's',
     'small', 'span', 'strong', 'sub', 'sup', 'time', 'u', 'var', 'wbr']
-  const closes = RegExp('^(' + ['area', 'base', 'br', 'col', 'command', 'embed', 'hr', 'img', 'input', 'keygen',
-    'link', 'meta', 'param', 'source', 'track', 'wbr'].join('|') + ')(?:[\.#][a-zA-Z0-9\u007F-\uFFFF_:-]+)*$')
+  const closes = RegExp('^(' + ['area', 'base', 'basefont', 'bgsound', 'br', 'col', 'command', 'embed', 'frame', 'hr',
+    'img', 'input', 'isindex', 'keygen', 'link', 'meta', 'param', 'source', 'track', 'wbr', '!--'].join('|')
+    + ')(?:[\.#][a-zA-Z0-9\u007F-\uFFFF_:-]+)*$')
 
   function append_child (parent, node) {
     parent.appendChild(node)
@@ -303,9 +306,8 @@ function html (comments) {
   }
 
   function create (tag, props, children) {
-    let el, ns
-    const namespace = props.namespace
-    if (namespace) ns = namespace
+    let el
+    const ns = props.namespace
     if (ns) {
       el = document.createElementNS(ns, tag)
     } else if (tag == comment_tag) {
@@ -318,8 +320,11 @@ function html (comments) {
       if (own(props, prop)) {
         key = lower(prop)
         value = props[prop]
-        if (key == 'classname') key = prop = 'class'
-        if (prop == 'htmlFor') prop = 'for'
+        if (key == 'classname') {
+          key = prop = 'class'
+        } else if (prop == 'htmlFor') {
+          prop = 'for'
+        }
         if (index(bool_tags, key) != -1) {
           if (value == 'true') {
             value = key
@@ -339,31 +344,30 @@ function html (comments) {
       }
     }
 
+    function clean_branch (branch) {
+      if (index(code_tags, name) == -1) {
+        if (index(text_tags, name) == -1) {
+          value = r(r(r(r(branch.nodeValue, lead_line, empty), multi_space, p), trail_line, empty), trail_space, empty)
+          value == empty ? el.removeChild(branch) : branch.nodeValue = value
+        } else {
+          branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? p : empty), lead_space, p), multi_space, p),
+            trail_line, empty), trail_space, empty)
+        }
+      }
+      return falsee
+    }
+
     function append_branch (children) {
       if (!is_array(children)) return
-      for (let branch, had = falsee, i = 0, length = len(children), node, value; i < length; i++) {
+      for (let branch, had = falsee, i = 0, length = len(children), node; i < length; i++) {
         node = children[i]
         if (is_array(node)) {
           append_branch(node)
           continue
         }
-        if (typeof node == 'number' || typeof node == 'boolean' || typeof node == func || node instanceof Date ||
+        if (typeof node == 'boolean' || node instanceof Date || typeof node == func || typeof node == 'number' ||
           node instanceof RegExp) node = node.toString()
         branch = el.childNodes[len(el.childNodes) - 1]
-
-        function clean_branch () {
-          had = falsee
-          if (index(code_tags, name) != -1) return
-          if (index(text_tags, name) == -1) {
-            value = r(r(r(r(branch.nodeValue, lead_line, empty), multi_space, p), trail_line, empty), trail_space,
-              empty)
-            value == empty ? el.removeChild(branch) : branch.nodeValue = value
-          } else {
-            branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? p : empty), lead_space, p),
-              multi_space, p), trail_line, empty), trail_space, empty)
-          }
-        }
-
         if (typeof node == string) {
           had = truee
           if (branch && node_name(branch) == '#text') {
@@ -373,9 +377,9 @@ function html (comments) {
             append_child(el, node)
             branch = node
           }
-          if (i == length - 1) clean_branch()
+          if (i == length - 1) had = clean_branch(branch)
         } else if (node && node.nodeType) {
-          if (had) clean_branch()
+          if (had) had = clean_branch(branch)
           name = lower(node_name(node))
           append_child(el, node)
         }
@@ -394,53 +398,46 @@ function html (comments) {
   }
 
   this.html = function (strings) {
-    let arg, closed = falsee, i, j, key, length = len(strings), old_key, part, segment, segments, stack_length, stat,
-      state = text_attr, text = empty, tree = [empty, {}, []]
-    const arglen = len(arguments), parts = [], stack = [[tree, -1]]
+    let arg, closed = falsee, frag = [empty, {}, []], fragment, fragments, i, j, key, length = len(strings), part,
+      past, stack_length, stat, state = text_attr, text = empty
+    const arglen = len(arguments), parts = [], stack = [[frag, -1]]
 
     function parse (string) {
       if (state == attr_value_w) state = attr
       const result = []
-      for (let char, i = 0, length = len(string), style_tag = falsee; i < length; i++) {
+      for (let char, i = 0, length = len(string); i < length; i++) {
         char = string.charAt(i)
         if (state == text_attr && char == '<') {
           if (len(text)) result.push([text_attr, text])
-          text = empty
           state = open_attr
-          style_tag = falsee
+          text = empty
         } else if (char == '>' && !(state == attr_sq || state == attr_dq) && state != comment) {
           if (state == open_attr && len(text)) {
             result.push([open_attr, text])
-            text == style ? style_tag = truee : text == styles ? style_tag = falsee : empty
           } else if (state == attr_key) {
             result.push([attr_key, text])
           } else if (state == attr_value && len(text)) {
             result.push([attr_value, text])
           }
-          if (state == text_attr && style_tag) {
-            text += char
-          } else {
-            result.push([close_attr, closed])
-            closed = falsee
-            text = empty
-          }
+          result.push([close_attr, closed])
+          closed = falsee
           state = text_attr
+          text = empty
         } else if (state == comment && test(end_hyphen, text) && char == '-') {
           if (comments) result.push([attr_value, text.substr(0, len(text) - 1)])
-          text = empty
           closed = truee
           state = text_attr
+          text = empty
         } else if (state == open_attr && test(start_comment, text)) {
           if (comments) result.push([open_attr, text], [attr_key, 'comment'], [attr_eq])
-          text = char
           state = comment
+          text = char
         } else if (state == open_attr && char == slash && len(text)) {
           closed = truee
         } else if (state == open_attr && test(whitespace, char)) {
           if (len(text)) result.push([open_attr, text])
-          text == style ? style_tag = truee : text == styles ? style_tag = falsee : empty
-          text = empty
           state = attr
+          text = empty
         } else if (state == open_attr || state == text_attr || state == comment) {
           text += char
         } else if (state == attr && test(not_whitespace, char)) {
@@ -451,16 +448,16 @@ function html (comments) {
           result.push([attr_break])
         } else if (state == attr_key && test(whitespace, char)) {
           result.push([attr_key, text])
-          text = empty
           state = attr_key_w
+          text = empty
         } else if (state == attr_key && char == eq) {
           result.push([attr_key, text], [attr_eq])
-          text = empty
           state = attr_value_w
+          text = empty
         } else if (state == attr_key && char == slash) {
           closed = truee
-          text = empty
           state = attr
+          text = empty
         } else if (state == attr_key) {
           text += char
         } else if ((state == attr_key_w || state == attr) && char == eq) {
@@ -469,8 +466,8 @@ function html (comments) {
         } else if ((state == attr_key_w || state == attr) && !test(whitespace, char)) {
           result.push([attr_break])
           if (test(word_or_hyphen, char)) {
-            text += char
             state = attr_key
+            text += char
           } else if (char == slash) {
             closed = truee
           } else {
@@ -483,11 +480,11 @@ function html (comments) {
         } else if ((state == attr_dq && char == dq) || (state == attr_sq && char == sq)
           || (state == attr_value && test(whitespace, char))) {
           result.push([attr_value, text], [attr_break])
-          text = empty
           state = attr
+          text = empty
         } else if (state == attr_value_w && !test(whitespace, char)) {
-          state = attr_value
           i--
+          state = attr_value
         } else if (state == attr_value || state == attr_sq || state == attr_dq) {
           text += char
         }
@@ -510,8 +507,11 @@ function html (comments) {
         arg = arguments[i + 1]
         part = parse(strings[i])
         stat = parseInt(state)
-        if (stat == attr_dq || stat == attr_sq || stat == attr_value_w) stat = attr_value
-        if (stat == attr) stat = attr_key
+        if (stat == attr_dq || stat == attr_sq || stat == attr_value_w) {
+          stat = attr_value
+        } else if (stat == attr) {
+          stat = attr_key
+        }
         if (stat == open_attr) {
           if (text == slash) {
             part.push([open_attr, slash, arg])
@@ -530,7 +530,7 @@ function html (comments) {
       }
     }
     for (i = 0, length = len(parts); i < length; i++) {
-      segments = stack[len(stack) - 1][0]
+      fragments = stack[len(stack) - 1][0]
       part = parts[i]
       state = part[0]
       if (state == open_attr && test(forward_slash, part[1])) {
@@ -538,12 +538,12 @@ function html (comments) {
         if (stack_length > 1) {
           j = stack[stack_length - 1][1]
           stack.pop()
-          stack[len(stack) - 1][0][2][j] = create(segments[0], segments[1], len(segments[2]) && segments[2])
+          stack[len(stack) - 1][0][2][j] = create(fragments[0], fragments[1], len(fragments[2]) && fragments[2])
         }
       } else if (state == open_attr) {
-        segment = [part[1], {}, []]
-        segments[2].push(segment)
-        stack.push([segment, len(segments[2]) - 1])
+        fragment = [part[1], {}, []]
+        fragments[2].push(fragment)
+        stack.push([fragment, len(fragments[2]) - 1])
       } else if (state == attr_key || (state == var_attr && part[1] == attr_key)) {
         key = empty
         for (length = len(parts); i < length; i++) {
@@ -552,8 +552,8 @@ function html (comments) {
             key = concat(key, part[1])
           } else if (part[0] == var_attr && part[1] == attr_key) {
             if (typeof part[2] == obj && !key) {
-              for (old_key in part[2]) {
-                if (own(part[2], old_key) && !segments[1][old_key]) segments[1][old_key] = part[2][old_key]
+              for (past in part[2]) {
+                if (own(part[2], past) && !fragments[1][past]) fragments[1][past] = part[2][past]
               }
             } else {
               key = concat(key, part[2])
@@ -566,64 +566,64 @@ function html (comments) {
         for (j = i, length = len(parts); i < length; i++) {
           part = parts[i]
           if (part[0] == attr_value || part[0] == attr_key) {
-            if (!segments[1][key]) {
-              segments[1][key] = string_func(part[1])
+            if (!fragments[1][key]) {
+              fragments[1][key] = string_func(part[1])
             } else if (part[1] != empty) {
-              segments[1][key] = concat(segments[1][key], part[1])
+              fragments[1][key] = concat(fragments[1][key], part[1])
             }
           } else if (part[0] == var_attr && (part[1] == attr_value || part[1] == attr_key)) {
-            if (!segments[1][key]) {
-              segments[1][key] = string_func(part[2])
+            if (!fragments[1][key]) {
+              fragments[1][key] = string_func(part[2])
             } else if (part[2] != empty) {
-              segments[1][key] = concat(segments[1][key], part[2])
+              fragments[1][key] = concat(fragments[1][key], part[2])
             }
           } else {
-            if (key && !segments[1][key] && i == j && (part[0] == close_attr || part[0] == attr_break)) {
-              segments[1][key] = lower(key)
+            if (key && !fragments[1][key] && i == j && (part[0] == close_attr || part[0] == attr_break)) {
+              fragments[1][key] = lower(key)
             }
             if (part[0] == close_attr) i--
             break
           }
         }
       } else if (state == attr_key) {
-        segments[1][part[1]] = truee
+        fragments[1][part[1]] = truee
       } else if (state == var_attr && part[1] == attr_key) {
-        segments[1][part[2]] = truee
+        fragments[1][part[2]] = truee
       } else if (state == close_attr) {
-        closed = part[1] || test(closes, segments[0])
+        closed = part[1] || test(closes, fragments[0])
         if (closed) {
           stack_length = len(stack)
           if (stack_length) {
             j = stack[stack_length - 1][1]
             stack.pop()
-            stack[len(stack) - 1][0][2][j] = create(segments[0], segments[1], len(segments[2]) && segments[2])
+            stack[len(stack) - 1][0][2][j] = create(fragments[0], fragments[1], len(fragments[2]) && fragments[2])
           }
         }
       } else if (state == var_attr && part[1] == text_attr) {
         if (!!part[2]) concat(empty, part[2])
-        is_array(part[2]) ? segments[2].push(...part[2]) : segments[2].push(part[2])
+        is_array(part[2]) ? fragments[2].push(...part[2]) : fragments[2].push(part[2])
       } else if (state == text_attr) {
-        segments[2].push(part[1])
+        fragments[2].push(part[1])
       }
     }
-    tree = tree[2]
-    if (len(tree) > 1 && test(whitespace_only, tree[0])) tree.shift()
-    if (len(tree) > 2 || (len(tree) == 2 && test(single_char_only, tree[1]))) {
-      segment = document.createDocumentFragment()
-      segments = tree
-      for (i = 0, length = len(segments); i < length; i++) {
-        if (typeof segments[i] == string) segments[i] = create_text_node(segments[i])
-        append_child(segment, segments[i])
+    frag = frag[2]
+    if (len(frag) > 1 && test(whitespace_only, frag[0])) frag.shift()
+    if (len(frag) > 2 || (len(frag) == 2 && test(single_char_only, frag[1]))) {
+      fragment = document.createDocumentFragment()
+      fragments = frag
+      for (i = 0, length = len(fragments); i < length; i++) {
+        if (typeof fragments[i] == string) fragments[i] = create_text_node(fragments[i])
+        append_child(fragment, fragments[i])
       }
-      return segment
+      return fragment
     }
-    tree = tree[0]
-    if (is_array(tree) && typeof tree[0] == string && is_array(tree[2])) return create(tree[0], tree[1], tree[2])
-    return tree
+    frag = frag[0]
+    if (is_array(frag) && typeof frag[0] == string && is_array(frag[2])) return create(frag[0], frag[1], frag[2])
+    return frag
   }
 }
 
-export const html = new html().html
+export const html = new chtml().html
 
 function array (a) {
   return Uint8Array.from(atob(a), a => a.charCodeAt())
