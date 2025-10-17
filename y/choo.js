@@ -248,15 +248,15 @@ export function choo () {
   }
 }
 
-function chtml (comments) {
+function html (comments) {
   const var_attr = 0, text_attr = 1, open_attr = 2, close_attr = 3, attr = 4, attr_key = 5, attr_key_w = 6,
       attr_value_w = 7, attr_value = 8, attr_sq = 9, attr_dq = 10, attr_eq = 11, attr_break = 12, comment = 13
   const comment_tag = '!--', dq = '"', eq = '=', func = 'function', obj = 'object', p = ' ', slash = '/', sq = "'",
       string = 'string'
   const end_hyphen = /-$/, forward_slash = /^\//, lead_line = /^\n[\s]+/, lead_space = /^[\s]+/,
-      multi_space = /[\n\s]+/g, not_whitespace = /[^\s"'=/]/, single_char_only = /\S/, start_comment = /^!--$/,
+      multi_space = /[\n\s]+/g, not_whitespace = /[^\s"'=/]/, single_char = /\S/, start_comment = /^!--$/,
       trail_line = /\n[\s]+$/, trail_space = /[\s]+$/, whitespace = /\s/,  whitespace_only = /^\s*$/,
-      word_or_hyphen = /[\w-]/, xmlns = /^xmlns($|:)/i
+      word_hyphen = /[\w-]/, xmlns = /^xmlns($|:)/i
   const bool_tags = ['autofocus', 'checked', 'defaultchecked', 'disabled', 'formnovalidate', 'indeterminate',
     'readonly', 'required', 'selected', 'willvalidate'], code_tags = ['code', 'pre'], text_tags = ['a', 'amp', 'abbr',
     'b', 'bdi', 'bdo', 'br', 'cite', 'data', 'dfn', 'em', 'i', 'kbd', 'mark', 'q', 'rp', 'rt', 'rtc', 'ruby', 's',
@@ -305,7 +305,48 @@ function chtml (comments) {
     return regex.test(string)
   }
 
-  function create (tag, props, children) {
+  function clean_branch (branch, el, name) {
+    if (index(code_tags, name) == -1) {
+      if (index(text_tags, name) == -1) {
+        const v = r(r(r(r(branch.nodeValue, lead_line, empty), multi_space, p), trail_line, empty), trail_space, empty)
+        v == empty ? el.removeChild(branch) : branch.nodeValue = v
+      } else {
+        branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? p : empty), lead_space, p), multi_space, p),
+          trail_line, empty), trail_space, empty)
+      }
+    }
+    return falsee
+  }
+
+  function append_branch (branches, el, name) {
+    if (!is_array(branches)) return
+    for (let branch, had = falsee, i = 0, length = len(branches), node; i < length; i++) {
+      node = branches[i]
+      if (is_array(node)) {
+        append_branch(node, el, name)
+        continue
+      }
+      if (typeof node == 'boolean' || node instanceof Date || typeof node == func || typeof node == 'number' ||
+        node instanceof RegExp) node = node.toString()
+      branch = el.childNodes[len(el.childNodes) - 1]
+      if (typeof node == string) {
+        had = truee
+        if (branch && node_name(branch) == '#text') {
+          branch.nodeValue += node
+        } else {
+          branch = create_text_node(node)
+          append_child(el, branch)
+        }
+        if (i == length - 1) had = clean_branch(branch, el, name)
+      } else if (node && node.nodeType) {
+        if (had) had = clean_branch(branch, el, name)
+        append_child(el, node)
+        name = lower(node_name(node))
+      }
+    }
+  }
+
+  function create (tag, props, branches) {
     let el
     const ns = props.namespace
     if (ns) {
@@ -343,49 +384,7 @@ function chtml (comments) {
         }
       }
     }
-
-    function clean_branch (branch) {
-      if (index(code_tags, name) == -1) {
-        if (index(text_tags, name) == -1) {
-          value = r(r(r(r(branch.nodeValue, lead_line, empty), multi_space, p), trail_line, empty), trail_space, empty)
-          value == empty ? el.removeChild(branch) : branch.nodeValue = value
-        } else {
-          branch.nodeValue = r(r(r(r(r(branch.nodeValue, lead_line, i ? p : empty), lead_space, p), multi_space, p),
-            trail_line, empty), trail_space, empty)
-        }
-      }
-      return falsee
-    }
-
-    function append_branch (children) {
-      if (!is_array(children)) return
-      for (let branch, had = falsee, i = 0, length = len(children), node; i < length; i++) {
-        node = children[i]
-        if (is_array(node)) {
-          append_branch(node)
-          continue
-        }
-        if (typeof node == 'boolean' || node instanceof Date || typeof node == func || typeof node == 'number' ||
-          node instanceof RegExp) node = node.toString()
-        branch = el.childNodes[len(el.childNodes) - 1]
-        if (typeof node == string) {
-          had = truee
-          if (branch && node_name(branch) == '#text') {
-            branch.nodeValue += node
-          } else {
-            node = create_text_node(node)
-            append_child(el, node)
-            branch = node
-          }
-          if (i == length - 1) had = clean_branch(branch)
-        } else if (node && node.nodeType) {
-          if (had) had = clean_branch(branch)
-          name = lower(node_name(node))
-          append_child(el, node)
-        }
-      }
-    }
-    append_branch(children)
+    append_branch(branches, el, name)
     return el
   }
 
@@ -398,13 +397,11 @@ function chtml (comments) {
   }
 
   this.html = function (strings) {
-    let arg, closed = falsee, frag = [empty, {}, []], fragment, fragments, i, j, key, length = len(strings), part,
-      past, stack_length, stat, state = text_attr, text = empty
-    const arglen = len(arguments), parts = [], stack = [[frag, -1]]
+    let closed = falsee, state = text_attr, text = empty
 
     function parse (string) {
-      if (state == attr_value_w) state = attr
       const result = []
+      if (state == attr_value_w) state = attr
       for (let char, i = 0, length = len(string); i < length; i++) {
         char = string.charAt(i)
         if (state == text_attr && char == '<') {
@@ -460,12 +457,12 @@ function chtml (comments) {
           text = empty
         } else if (state == attr_key) {
           text += char
-        } else if ((state == attr_key_w || state == attr) && char == eq) {
+        } else if ((state == attr || state == attr_key_w) && char == eq) {
           result.push([attr_eq])
           state = attr_value_w
-        } else if ((state == attr_key_w || state == attr) && !test(whitespace, char)) {
+        } else if ((state == attr || state == attr_key_w) && !test(whitespace, char)) {
           result.push([attr_break])
-          if (test(word_or_hyphen, char)) {
+          if (test(word_hyphen, char)) {
             state = attr_key
             text += char
           } else if (char == slash) {
@@ -502,7 +499,9 @@ function chtml (comments) {
       return result
     }
 
-    for (i = 0; i < length; i++) {
+    let arg, frag = [empty, {}, []], fragment, fragments, i, j, key, length, part, past, stacks, stat
+    const arglen = len(arguments), parts = [], stack = [[frag, -1]]
+    for (i = 0, length = len(strings); i < length; i++) {
       if (i < arglen - 1) {
         arg = arguments[i + 1]
         part = parse(strings[i])
@@ -534,9 +533,9 @@ function chtml (comments) {
       part = parts[i]
       state = part[0]
       if (state == open_attr && test(forward_slash, part[1])) {
-        stack_length = len(stack)
-        if (stack_length > 1) {
-          j = stack[stack_length - 1][1]
+        stacks = len(stack)
+        if (stacks > 1) {
+          j = stack[stacks - 1][1]
           stack.pop()
           stack[len(stack) - 1][0][2][j] = create(fragments[0], fragments[1], len(fragments[2]) && fragments[2])
         }
@@ -563,22 +562,22 @@ function chtml (comments) {
           }
         }
         if (part[0] == attr_eq) i++
-        for (j = i, length = len(parts); i < length; i++) {
+        for (j = i; i < length; i++) {
           part = parts[i]
-          if (part[0] == attr_value || part[0] == attr_key) {
+          if (part[0] == attr_key || part[0] == attr_value) {
             if (!fragments[1][key]) {
               fragments[1][key] = string_func(part[1])
             } else if (part[1] != empty) {
               fragments[1][key] = concat(fragments[1][key], part[1])
             }
-          } else if (part[0] == var_attr && (part[1] == attr_value || part[1] == attr_key)) {
+          } else if (part[0] == var_attr && (part[1] == attr_key || part[1] == attr_value)) {
             if (!fragments[1][key]) {
               fragments[1][key] = string_func(part[2])
             } else if (part[2] != empty) {
               fragments[1][key] = concat(fragments[1][key], part[2])
             }
           } else {
-            if (key && !fragments[1][key] && i == j && (part[0] == close_attr || part[0] == attr_break)) {
+            if (key && !fragments[1][key] && i == j && (part[0] == attr_break || part[0] == close_attr)) {
               fragments[1][key] = lower(key)
             }
             if (part[0] == close_attr) i--
@@ -590,11 +589,10 @@ function chtml (comments) {
       } else if (state == var_attr && part[1] == attr_key) {
         fragments[1][part[2]] = truee
       } else if (state == close_attr) {
-        closed = part[1] || test(closes, fragments[0])
-        if (closed) {
-          stack_length = len(stack)
-          if (stack_length) {
-            j = stack[stack_length - 1][1]
+        if (part[1] || test(closes, fragments[0])) {
+          stacks = len(stack)
+          if (stacks) {
+            j = stack[stacks - 1][1]
             stack.pop()
             stack[len(stack) - 1][0][2][j] = create(fragments[0], fragments[1], len(fragments[2]) && fragments[2])
           }
@@ -608,12 +606,11 @@ function chtml (comments) {
     }
     frag = frag[2]
     if (len(frag) > 1 && test(whitespace_only, frag[0])) frag.shift()
-    if (len(frag) > 2 || (len(frag) == 2 && test(single_char_only, frag[1]))) {
+    if (len(frag) > 2 || (len(frag) == 2 && test(single_char, frag[1]))) {
       fragment = document.createDocumentFragment()
-      fragments = frag
-      for (i = 0, length = len(fragments); i < length; i++) {
-        if (typeof fragments[i] == string) fragments[i] = create_text_node(fragments[i])
-        append_child(fragment, fragments[i])
+      for (i = 0, length = len(frag); i < length; i++) {
+        if (typeof frag[i] == string) frag[i] = create_text_node(frag[i])
+        append_child(fragment, frag[i])
       }
       return fragment
     }
@@ -623,70 +620,7 @@ function chtml (comments) {
   }
 }
 
-export const html = new chtml().html
-
-function array (a) {
-  return Uint8Array.from(atob(a), a => a.charCodeAt())
-}
-
-function string (a) {
-  return btoa(String.fromCharCode(...a))
-}
-
-function random (bytes=1) {
-  return crypto.getRandomValues(new Uint8Array(bytes))
-}
-
-function random_string (chars=1) {
-  return string(random((chars + 1) * 0.75)).slice(0, chars)
-}
-
-function blob (a) {
-  return new Blob([a])
-}
-
-function file_reader () {
-  return new FileReader()
-}
-
-function promise (a) {
-  return new Promise(a)
-}
-
-function base (a) {
-  return promise(resolve => {
-    const b = file_reader()
-    b.onloadend = a => resolve(b.result.slice(37))
-    b.readAsDataURL(blob(a))
-  })
-}
-
-function sabe (a) {
-  return promise(resolve => {
-    const b = file_reader()
-    b.onloadend = a => resolve(b.result)
-    b.readAsText(blob(a))
-  })
-}
-
-async function encrypt (patch) {
-  patch = array(await base(JSON.stringify(patch)))
-  const length = len(patch)
-  const rand = random(length)
-  for (let i = 0; i < length; i++) {
-    patch[i] ^= rand[i]
-  }
-  return [string(patch), string(rand)]
-}
-
-async function decrypt (patch, rand) {
-  patch = array(patch)
-  rand = array(rand)
-  for (let i = 0, length = len(patch); i < length; i++) {
-    patch[i] ^= rand[i]
-  }
-  return JSON.parse(await sabe(patch))
-}
+export var html = new html().html
 
 function cache () {
   const a = 'a', b = 'b', dot = '.', rw = 'readwrite', slash = '/', spa = ' ('
@@ -757,6 +691,69 @@ function cache () {
     await open()
     const key = await get(a, name)
     return key && await get(b, key) || falsee
+  }
+
+  function bytes (a) {
+    return Uint8Array.from(atob(a), a => a.charCodeAt())
+  }
+
+  function string (a) {
+    return btoa(String.fromCharCode(...a))
+  }
+
+  function random (bytes=1) {
+    return crypto.getRandomValues(new Uint8Array(bytes))
+  }
+
+  function random_string (chars=1) {
+    return string(random((chars + 1) * 0.75)).slice(0, chars)
+  }
+
+  function blob (a) {
+    return new Blob([a])
+  }
+
+  function file_reader () {
+    return new FileReader()
+  }
+
+  function promise (a) {
+    return new Promise(a)
+  }
+
+  function base (a) {
+    return promise(resolve => {
+      const b = file_reader()
+      b.onloadend = a => resolve(b.result.slice(37))
+      b.readAsDataURL(blob(a))
+    })
+  }
+
+  function sabe (a) {
+    return promise(resolve => {
+      const b = file_reader()
+      b.onloadend = a => resolve(b.result)
+      b.readAsText(blob(a))
+    })
+  }
+
+  this.encrypt = async function (patch) {
+    patch = bytes(await base(JSON.stringify(patch)))
+    const length = len(patch)
+    const rand = random(length)
+    for (let i = 0; i < length; i++) {
+      patch[i] ^= rand[i]
+    }
+    return [string(patch), string(rand)]
+  }
+
+  this.decrypt = async function (patch, rand) {
+    patch = bytes(patch)
+    rand = bytes(rand)
+    for (let i = 0, length = len(patch); i < length; i++) {
+      patch[i] ^= rand[i]
+    }
+    return JSON.parse(await sabe(patch))
   }
 
   async function get_key (key) {
@@ -1081,4 +1078,4 @@ function cache () {
   }
 }
 
-export const cache = new cache()
+export var cache = new cache()
