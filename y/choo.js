@@ -246,6 +246,7 @@ export function choo () {
     self.f = document.getElementById(node)
     walk(self)
   }
+
 }
 
 function html (comments) {
@@ -618,6 +619,7 @@ function html (comments) {
     if (is_array(frag) && typeof frag[0] == string && is_array(frag[2])) return create(frag[0], frag[1], frag[2])
     return frag
   }
+
 }
 
 export var html = new html().html
@@ -709,36 +711,16 @@ function cache () {
     return string(random((chars + 1) * 0.75)).slice(0, chars)
   }
 
-  function blob (a) {
-    return new Blob([a])
-  }
-
-  function file_reader () {
-    return new FileReader()
-  }
-
-  function promise (a) {
-    return new Promise(a)
-  }
-
   function base (a) {
-    return promise(resolve => {
-      const b = file_reader()
-      b.onloadend = a => resolve(b.result.slice(37))
-      b.readAsDataURL(blob(a))
-    })
+    return new TextEncoder().encode(a)
   }
 
   function sabe (a) {
-    return promise(resolve => {
-      const b = file_reader()
-      b.onloadend = a => resolve(b.result)
-      b.readAsText(blob(a))
-    })
+    return new TextDecoder().decode(a)
   }
 
-  this.encrypt = async function (patch) {
-    patch = bytes(await base(JSON.stringify(patch)))
+  this.encrypt = function (patch) {
+    patch = base(JSON.stringify(patch))
     const length = len(patch)
     const rand = random(length)
     for (let i = 0; i < length; i++) {
@@ -747,13 +729,13 @@ function cache () {
     return [string(patch), string(rand)]
   }
 
-  this.decrypt = async function (patch, rand) {
+  this.decrypt = function (patch, rand) {
     patch = bytes(patch)
     rand = bytes(rand)
     for (let i = 0, length = len(patch); i < length; i++) {
       patch[i] ^= rand[i]
     }
-    return JSON.parse(await sabe(patch))
+    return JSON.parse(sabe(patch))
   }
 
   async function get_key (key) {
@@ -1076,6 +1058,7 @@ function cache () {
   this.move = async function (src, dst, merge=falsee) {
     return await this.copy(src, dst, merge, truee)
   }
+
 }
 
 export var cache = new cache()

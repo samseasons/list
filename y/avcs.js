@@ -105,7 +105,7 @@ function bcdiff (past, next) {
           patch.push(pos, l)
           r.push(q += 2)
         } else {
-          patch.push(-1, l, ...buffer)
+          patch.push('a', l, ...buffer)
           r.push(q += 2 + l)
         }
         buffer = []
@@ -121,12 +121,12 @@ function bcdiff (past, next) {
   }
   l = len(buffer)
   if (l) {
-    patch.push(-1, l, ...buffer)
+    patch.push('a', l, ...buffer)
     r.push(q += 2 + l)
   }
   let bs = {}, h, j, k, m = [], p = []
   for (i of r) {
-    if (patch[i] == -1) {
+    if (patch[i] == 'a') {
       buffer = patch.slice(i + 2, i + 2 + patch[i + 1])
       j = 0
       l = len(buffer)
@@ -155,7 +155,8 @@ function bcdiff (past, next) {
       }
     }
   }
-  let cs = {}, ds = {}, e
+  let a, b, c, d, e
+  let cs = {}, ds = {}
   i = 0, j = 0, length = len(patch), r = []
   while (i < length) {
     cs[i] = j + 1
@@ -164,7 +165,7 @@ function bcdiff (past, next) {
     while (h-- > 0 && !(h in cs)) cs[h] = l--
     e = falsee
     if (i in bs) {
-      let a, b, c = -1, d = falsee
+      c = -1, d = falsee
       for (a of bs[i]) {
         b = a[0]
         if (p.indexOf(b) == -1 && (c == -1 || abs(b - i) < c)) {
@@ -173,14 +174,14 @@ function bcdiff (past, next) {
         }
       }
       if (d) {
-        buffer = [-2, ...d]
+        buffer = ['b', ...d]
         ds[i] = d[0]
         e = truee
         i += len(patch.slice(i, i + 2 + patch[i + 1]))
       }
     }
     if (!e) {
-      if (patch[i] == -1) {
+      if (patch[i] == 'a') {
         buffer = patch.slice(i, i + 2 + patch[i + 1])
       } else {
         buffer = patch.slice(i, i + 2)
@@ -197,28 +198,27 @@ function bcdiff (past, next) {
 }
 
 function bcpatch (last, patch) {
-  let b, c, d, i = 0, l = len(patch), past = []
+  let a, b, c, i = 0, l = len(patch), past = []
   if (l == 1) return [...last.slice(patch[0])]
   while (i < l) {
-    b = patch[i++]
-    if (b >= 0) {
-      past.push(...last.slice(b, b + patch[i++]))
-    } else if (b == -1) {
-      b = patch[i++]
-      past.push(...patch.slice(i, i += b))
-    } else if (b == -2) {
-      b = patch[i++]
-      past.push(...patch.slice(b, b + patch[i++]))
-    } else if (b == -3) {
-      b = patch[i++]
-      c = patch.slice(i, b + i)
-      d = patch[i++]
-      past.push(...last.slice(d, d + patch[i++]).map((a, e) => a + c[e % b]))
-    } else if (b == -4) {
-      b = patch[i++]
-      c = patch.slice(i, b + i)
-      d = patch[i++]
-      past.push(...Array(d).fill().map((a, e) => c[e % b]))
+    a = patch[i++]
+    if (typeof a == 'number') {
+      past.push(...last.slice(a, a + patch[i++]))
+    } else if (a == 'a') {
+      a = patch[i++]
+      past.push(...patch.slice(i, i += a))
+    } else if (a == 'b') {
+      a = patch[i++]
+      past.push(...patch.slice(a, a + patch[i++]))
+    } else if (a == 'c') {
+      a = patch[i++]
+      b = patch.slice(i, i += a)
+      past.push(...Array(patch[i++]).fill().map((d, c) => b[c % a]))
+    } else if (a == 'd') {
+      a = patch[i++]
+      b = patch.slice(i, i += a)
+      c = patch[i++]
+      past.push(...last.slice(c, c + patch[i++]).map((d, c) => b[c % a] + d))
     }
   }
   return past
@@ -234,17 +234,29 @@ function avcs () {
     return new Uint32Array(a)
   }
 
-  function bytebits (bits) {
-    const bytes = []
-    for (let byte = 0, h, i = 0, l = len(bits); i < l; i++) {
-      h = i % 8
-      byte += bits[i] * 2 ** h
-      if (h == 7 || i == l - 1) {
-        bytes.push(byte)
-        byte = 0
-      }
+  function uint32_t (a) {
+    return uint32([a])[0]
+  }
+
+  function bytebits (a) {
+    let b = 0, c = a.length, d = []
+    while (b < c) {
+      d.push(a[b++] ^ a[b++] << 1 ^ a[b++] << 2 ^ a[b++] << 3 ^ a[b++] << 4 ^ a[b++] << 5 ^ a[b++] << 6 ^ a[b++] << 7)
     }
-    return bytes
+    return uint8(d)
+  }
+
+  function bytebytes (a) {
+    let b = 0, c = a.length, d = [], e, f = 255, g = 0, h = 1
+    while (b < c) {
+      e = a[b++]
+      if (e > g) g = e
+      d.push(e & f, e >> 8 & f, e >> 16 & f, e >> 24 & f)
+    }
+    while (uint32_t(g /= 256) > 0) h++
+    d = d.filter((a, b) => b % 4 < h)
+    if (len(d)) d.unshift(h)
+    return uint8(d)
   }
 
   function bytenums (a) {
@@ -256,43 +268,29 @@ function avcs () {
     return uint8(d)
   }
 
-  function blob (a) {
-    return new Blob([a])
-  }
-
-  function file_reader () {
-    return new FileReader()
-  }
-
-  function promise (a) {
-    return new Promise(a)
-  }
-
   function base (a) {
-    return promise(resolve => {
-      const b = file_reader()
-      b.onloadend = a => resolve(b.result.slice(37))
-      b.readAsDataURL(blob(a))
-    })
+    return new TextEncoder().encode(a)
   }
 
   function sabe (a) {
-    return promise(resolve => {
-      const b = file_reader()
-      b.onloadend = a => resolve(b.result)
-      b.readAsText(blob(a))
-    })
+    return new TextDecoder().decode(a)
   }
 
-  function bytes (a) {
-    return Uint8Array.from(atob(a), a => a.charCodeAt())
+  function lend (a) {
+    let b, c = []
+    while (a.length > 0) {
+      b = [...a.slice(0, 4)]
+      while (b[b.length - 1] == 0) b.pop()
+      c.push(b)
+      a = a.slice(4)
+    }
+    return c
   }
 
-  async function encode (patch) {
-    let i = 0, length = len(patch), p
+  this.encode = function (patch) {
     let bits = [], lens = [], nums = [], strs = []
-    while (i < length) {
-      p = patch[i++]
+    for (let i = 0, length = len(patch), p; i < length; i++) {
+      p = patch[i]
       if (typeof p == 'number') {
         bits.push(0)
         nums.push(p)
@@ -302,45 +300,56 @@ function avcs () {
       }
     }
     bits = bytebits(bits)
-    nums = bytenums(uint32(nums))
-    lens = bytenums([len(bits), len(nums)])
-    strs = bytes(await base(JSON.stringify(strs.join(''))))
-    return uint8([...lens, ...bits, ...nums, ...strs])
+    nums = bytebytes(uint32(nums))
+    lens = lend(bytenums([len(bits), len(nums)]))
+    strs = base(strs.join(''))
+    const lent = len(lens[0]) + 4 * len(lens[1])
+    return uint8([lent, ...lens, ...bits, ...nums, ...strs])
   }
 
-  function bitbytes (bytes) {
-    const bits = []
-    for (let byte, i = 0, l = len(bytes); i < l; i++) {
-      byte = bytes[i]
-      for (let j = 0; j < 8; j++) {
-        bits.push(byte % 2)
-        byte = uint32([byte / 2])[0]
-      }
+  function bitbytes (a) {
+    let b = 0, c = a.length, d = [], e, f = 1
+    while (b < c) {
+      e = a[b++]
+      d.push(e & f, e >> 1 & f, e >> 2 & f, e >> 3 & f, e >> 4 & f, e >> 5 & f, e >> 6 & f, e >> 7 & f)
     }
-    return bits
+    return d
+  }
+
+  function bytesbytes (a) {
+    let b = 1, c = a.length, d = [], e, f, g = a[0]
+    while (b < c) {
+      e = 0, f = 0
+      while (f < g) {
+        e ^= a[b++] << f++ * 8
+      }
+      d.push(e)
+    }
+    return uint32(d)
   }
 
   function numbytes (a) {
     let b = 0, c = a.length, d = []
     while (b < c) {
-      d.push(a[b++] ^ a[b++] << 8 ^ a[b++] << 16 ^ a[b++] << 24 >> 0)
+      d.push(a[b++] ^ a[b++] << 8 ^ a[b++] << 16 ^ a[b++] << 24)
     }
     return uint32(d)
   }
 
-  async function decode (bytes) {
-    const len0 = numbytes(bytes.slice(0, 4))
-    bytes = bytes.slice(4)
-    const len1 = numbytes(bytes.slice(0, 4))
-    bytes = bytes.slice(4)
-    const bits = bitbytes(bytes.slice(0, len0))
-    bytes = bytes.slice(len0)
-    const nums = new Int32Array(numbytes(bytes.slice(0, len1)))
-    const strs = JSON.parse(await sabe(bytes.slice(len1)))
+  this.decode = function (bytes) {
+    let b = 0
+    let len0 = bytes[b++]
+    let len1 = len0 % 4
+    len0 = uint32_t(len0 / 4)
+    len0 = numbytes([...bytes.slice(b, b += len0), ...uint8(4 - len0)])[0]
+    len1 = numbytes([...bytes.slice(b, b += len1), ...uint8(4 - len1)])[0]
+    const bits = bitbytes(bytes.slice(b, b += len0))
+    const nums = bytesbytes(bytes.slice(b, b += len1))
+    const strs = sabe(bytes.slice(b))
     const patch = []
-    let bit, i = 0, j = 0
-    for (bit of bits) {
-      patch.push(bit == 0 ? nums[i++] : strs[j++])
+    let i = 0, j = 0
+    for (b of bits) {
+      patch.push(b == 0 ? nums[i++] : strs[j++])
     }
     return patch
   }
@@ -353,8 +362,7 @@ function avcs () {
     return btoa(String.fromCharCode(...a))
   }
 
-  this.encrypt = async function (patch) {
-    patch = bytes(await base(JSON.stringify(patch)))
+  this.encrypt = function (patch) {
     const length = len(patch)
     const rand = random(length)
     for (let i = 0; i < length; i++) {
@@ -363,26 +371,30 @@ function avcs () {
     return [string(patch), string(rand)]
   }
 
-  this.decrypt = async function (patch, rand) {
+  function bytes (a) {
+    return Uint8Array.from(atob(a), a => a.charCodeAt())
+  }
+
+  this.decrypt = function (patch, rand) {
     patch = bytes(patch)
     rand = bytes(rand)
     for (let i = 0, length = len(patch); i < length; i++) {
       patch[i] ^= rand[i]
     }
-    return JSON.parse(await sabe(patch))
+    return patch
   }
 
-  this.diff = async function (past, next, bytes=truee, encrypt=falsee) {
+  this.diff = function (past, next, bytes=truee, encrypt=falsee) {
     let patch = bcdiff(past, next)
-    if (bytes) patch = await encode(patch)
+    if (bytes || encrypt) patch = this.encode(patch)
     return encrypt ? this.encrypt(patch) : patch
   }
 
-  this.patch = async function (last, patch, bytes=truee, encrypt=falsee) {
+  this.patch = function (last, patch, bytes=truee, encrypt=falsee) {
     if (encrypt) patch = this.decrypt(patch, encrypt)
-    if (bytes) patch = await decode(patch)
+    if (bytes || encrypt) patch = this.decode(patch)
     const past = bcpatch(last, patch)
-    return typeof past == 'object' ? past.join('') : past
+    return typeof last == 'string' ? past.join('') : past
   }
 
 }
