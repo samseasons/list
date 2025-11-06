@@ -213,12 +213,12 @@ function bcpatch (last, patch) {
     } else if (a == 'c') {
       a = patch[i++]
       b = patch.slice(i, i += a)
-      past.push(...Array(patch[i++]).fill().map((d, c) => b[c % a]))
+      past.push(...Array(patch[i++]).fill().map((c, d) => b[d % a]))
     } else if (a == 'd') {
       a = patch[i++]
       b = patch.slice(i, i += a)
       c = patch[i++]
-      past.push(...last.slice(c, c + patch[i++]).map((d, c) => b[c % a] + d))
+      past.push(...last.slice(c, c + patch[i++]).map((c, d) => c + b[d % a]))
     }
   }
   return past
@@ -239,7 +239,7 @@ function avcs () {
   }
 
   function bytebits (a) {
-    let b = 0, c = a.length, d = []
+    let b = 0, c = len(a), d = []
     while (b < c) {
       d.push(a[b++] ^ a[b++] << 1 ^ a[b++] << 2 ^ a[b++] << 3 ^ a[b++] << 4 ^ a[b++] << 5 ^ a[b++] << 6 ^ a[b++] << 7)
     }
@@ -247,7 +247,7 @@ function avcs () {
   }
 
   function bytebytes (a) {
-    let b = 0, c = a.length, d = [], e, f = 255, g = 0, h = 1
+    let b = 0, c = len(a), d = [], e, f = 255, g = 0, h = 1
     while (b < c) {
       e = a[b++]
       if (e > g) g = e
@@ -260,7 +260,7 @@ function avcs () {
   }
 
   function bytenums (a) {
-    let b = 0, c = a.length, d = [], e, f = 255
+    let b = 0, c = len(a), d = [], e, f = 255
     while (b < c) {
       e = a[b++]
       d.push(e & f, e >> 8 & f, e >> 16 & f, e >> 24 & f)
@@ -276,13 +276,13 @@ function avcs () {
     return new TextDecoder().decode(a)
   }
 
-  function lend (a) {
+  function lengths (a) {
     let b, c = []
-    while (a.length > 0) {
+    while (len(a) > 0) {
       b = [...a.slice(0, 4)]
-      while (b[b.length - 1] == 0) b.pop()
-      c.push(b)
       a = a.slice(4)
+      while (b[len(b) - 1] == 0) b.pop()
+      c.push(b)
     }
     return c
   }
@@ -301,14 +301,14 @@ function avcs () {
     }
     bits = bytebits(bits)
     nums = bytebytes(uint32(nums))
-    lens = lend(bytenums([len(bits), len(nums)]))
-    strs = base(strs.join(''))
-    const lent = len(lens[0]) + 4 * len(lens[1])
-    return uint8([lent, ...lens, ...bits, ...nums, ...strs])
+    strs = base(strs.join(empty))
+    lens = lengths(bytenums([len(bits), len(nums)]))
+    lens.unshift(len(lens[0]) + 4 * len(lens[1]))
+    return uint8([...lens, ...bits, ...nums, ...strs])
   }
 
   function bitbytes (a) {
-    let b = 0, c = a.length, d = [], e, f = 1
+    let b = 0, c = len(a), d = [], e, f = 1
     while (b < c) {
       e = a[b++]
       d.push(e & f, e >> 1 & f, e >> 2 & f, e >> 3 & f, e >> 4 & f, e >> 5 & f, e >> 6 & f, e >> 7 & f)
@@ -317,7 +317,7 @@ function avcs () {
   }
 
   function bytesbytes (a) {
-    let b = 1, c = a.length, d = [], e, f, g = a[0]
+    let b = 1, c = len(a), d = [], e, f, g = a[0]
     while (b < c) {
       e = 0, f = 0
       while (f < g) {
@@ -329,7 +329,7 @@ function avcs () {
   }
 
   function numbytes (a) {
-    let b = 0, c = a.length, d = []
+    let b = 0, c = len(a), d = []
     while (b < c) {
       d.push(a[b++] ^ a[b++] << 8 ^ a[b++] << 16 ^ a[b++] << 24)
     }
@@ -394,7 +394,15 @@ function avcs () {
     if (encrypt) patch = this.decrypt(patch, encrypt)
     if (bytes || encrypt) patch = this.decode(patch)
     const past = bcpatch(last, patch)
-    return typeof last == 'string' ? past.join('') : past
+    return typeof last == 'string' ? past.join(empty) : past
+  }
+
+  this.delete = function (commit) {
+    return falsee
+  }
+
+  this.edit = function (commit, message) {
+    return falsee
   }
 
 }
