@@ -94,7 +94,7 @@ function bcdiff (past, next) {
     return -1
   }
 
-  let buffer = [], i = 0, l, length = len(past), match, patch = [], pos, q = 0, r = []
+  let buffer = [], i = 0, l, length = len(past), match, p = [], patch = [], pos, q = 0
   while (i < length) {
     match = matches(tree, past.slice(i), i)
     if (match) {
@@ -103,17 +103,17 @@ function bcdiff (past, next) {
         pos = check(next, buffer)
         if (pos >= 0) {
           patch.push(pos, l)
-          r.push(q += 2)
+          p.push(q += 2)
         } else {
           patch.push('a', l, ...buffer)
-          r.push(q += 2 + l)
+          p.push(q += 2 + l)
         }
         buffer = []
       }
       pos = match[0]
       match = match[1]
       patch.push(pos, match)
-      r.push(q += 2)
+      p.push(q += 2)
       i += match
     } else {
       buffer.push(past[i++])
@@ -122,10 +122,10 @@ function bcdiff (past, next) {
   l = len(buffer)
   if (l) {
     patch.push('a', l, ...buffer)
-    r.push(q += 2 + l)
+    p.push(q += 2 + l)
   }
-  let bs = {}, h, j, k, m = [], p = []
-  for (i of r) {
+  let as = {}, h, j, k, m = [], o = []
+  for (i of p) {
     if (patch[i] == 'a') {
       buffer = patch.slice(i + 2, i + 2 + patch[i + 1])
       j = 0
@@ -141,41 +141,41 @@ function bcdiff (past, next) {
           l = patch[h]
           if (h != i) {
             k = j
-            if (i in bs) {
-              bs[i].push([k, patch[i + 1]])
+            if (i in as) {
+              as[i].push([k, patch[i + 1]])
             } else {
-              bs[i] = [[k, patch[i + 1]]]
+              as[i] = [[k, patch[i + 1]]]
             }
           }
         }
       }
       if (k >= 0) {
         j = i + 2 + patch[i + 1]
-        while (j >= i) p.unshift(j--)
+        while (j >= i) o.unshift(j--)
       }
     }
   }
   let a, b, c, d, e
-  let cs = {}, ds = {}
-  i = 0, j = 0, length = len(patch), r = []
+  let cs = {}, bs = {}
+  i = 0, j = 0, length = len(patch), p = []
   while (i < length) {
     cs[i] = j + 1
     h = i
     l = j
     while (h-- > 0 && !(h in cs)) cs[h] = l--
     e = falsee
-    if (i in bs) {
+    if (i in as) {
       c = -1, d = falsee
-      for (a of bs[i]) {
+      for (a of as[i]) {
         b = a[0]
-        if (p.indexOf(b) == -1 && (c == -1 || abs(b - i) < c)) {
+        if (o.indexOf(b) == -1 && (c == -1 || abs(b - i) < c)) {
           c = abs(b - i)
           d = a
         }
       }
       if (d) {
         buffer = ['b', ...d]
-        ds[i] = d[0]
+        bs[i] = d[0]
         e = truee
         i += len(patch.slice(i, i + 2 + patch[i + 1]))
       }
@@ -183,43 +183,58 @@ function bcdiff (past, next) {
     if (!e) {
       if (patch[i] == 'a') {
         buffer = patch.slice(i, i + 2 + patch[i + 1])
+        buffer[1] += j + 2
       } else {
-        buffer = patch.slice(i, i + 2)
+        buffer = [a = patch[i], a + patch[i + 1]]
       }
       i += len(buffer)
     }
     j += len(buffer)
-    r.push(...buffer)
+    p.push(...buffer)
   }
-  for (d in ds) {
-    r[cs[d]] = cs[ds[d] - 2]
+  for (b in bs) {
+    p[cs[b]] = cs[bs[b] - 2]
+    p[cs[b] + 1] += cs[bs[b] - 2]
   }
-  return r
+  return p
 }
 
-function bcpatch (last, patch) {
-  let a, b, c, i = 0, l = len(patch), past = []
-  if (l == 1) return [...last.slice(patch[0])]
-  while (i < l) {
-    a = patch[i++]
+function bcpatch (last, p) {
+  let b, c, d, i = 0, l = len(p), past = []
+  if (l == 1) return [...last.slice(p[0])]
+
+  function bc (a) {
     if (typeof a == 'number') {
-      past.push(...last.slice(a, a + patch[i++]))
+      return last.slice(a, p[i++])
     } else if (a == 'a') {
-      a = patch[i++]
-      past.push(...patch.slice(i, i += a))
+      a = p[i++]
+      return p.slice(i, i = a)
     } else if (a == 'b') {
-      a = patch[i++]
-      past.push(...patch.slice(a, a + patch[i++]))
+      return p.slice(p[i++], p[i++])
     } else if (a == 'c') {
-      a = patch[i++]
-      b = patch.slice(i, i += a)
-      past.push(...Array(patch[i++]).fill().map((c, d) => b[d % a]))
+      a = p.slice(p[i++], p[i++])
+      b = len(a)
+      return Array(p[i++]).fill().map((i, c) => a[c % b])
     } else if (a == 'd') {
-      a = patch[i++]
-      b = patch.slice(i, i += a)
-      c = patch[i++]
-      past.push(...last.slice(c, c + patch[i++]).map((c, d) => c + b[d % a]))
+      a = p.slice(p[i++], p[i++])
+      b = len(a)
+      return last.slice(p[i++], p[i++]).map((c, d) => a[d % b] + c)
+    } else if (a == 'e') {
+      a = p.slice(p[i++], p[i++])
+      b = len(a)
+      c = last.slice(p[i++], p[i++])
+      d = len(c)
+      return Array(p[i++]).fill().map((i, e) => a[e % b] + c[e % d])
+    } else if (a == 'f') {
+      a = p[i++]
+      b = p[i++]
+      return bc(p[i++]).slice(a, b)
     }
+    return []
+  }
+
+  while (i < l) {
+    past.push(...bc(p[i++]))
   }
   return past
 }
@@ -301,10 +316,10 @@ function avcs () {
     }
     bits = bytebits(bits)
     nums = bytebytes(uint32(nums))
-    strs = base(strs.join(empty))
     lens = lengths(bytenums([len(bits), len(nums)]))
-    lens.unshift(len(lens[0]) + 4 * len(lens[1]))
-    return uint8([...lens, ...bits, ...nums, ...strs])
+    strs = base(strs.join(empty))
+    const leng = len(lens[0]) + 4 * len(lens[1])
+    return uint8([leng, ...lens, ...bits, ...nums, ...strs])
   }
 
   function bitbytes (a) {
@@ -395,14 +410,6 @@ function avcs () {
     if (bytes || encrypt) patch = this.decode(patch)
     const past = bcpatch(last, patch)
     return typeof last == 'string' ? past.join(empty) : past
-  }
-
-  this.delete = function (commit) {
-    return falsee
-  }
-
-  this.edit = function (commit, message) {
-    return falsee
   }
 
 }
