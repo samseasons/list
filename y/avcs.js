@@ -94,6 +94,51 @@ function bcdiff (past, next) {
     return -1
   }
 
+  function reps (str) {
+    let repeats, section
+    for (let g, h, i = 0, j, l = len(str), length, longest = 2, repeat, substr, substrs; i < l; i++) {
+      for (j = i + 1; j <= l; j++) {
+        substr = str.slice(i, j)
+        k = j - i
+        repeat = 0
+        substrs = [...substr, ...substr]
+        for (g = 2, h = (len(str) - i + 1) / k; g < h; g++) {
+          substrs.push(...substr)
+          if (check(str, substr) > -1) {
+            repeat = g
+          }
+        }
+        length = repeat * k
+        if (length > longest) {
+          longest = length
+          repeats = repeat
+          section = substr
+        }
+      }
+    }
+    return [repeats, section]
+  }
+
+  function comp (a) {
+    const b = reps(a)
+    if (falsee) {
+      const c = []
+      const d = a.indexOf(c)
+      const e = len(c)
+      let f = []
+      if (d > 2) {
+        f = [...comp(['c', a[1] + e, a.slice(2, d)])]
+      }
+      f.push('c', len(b[1]), ...b[1], b[0])
+      if (e < len(a) - 2) {
+        f.push(...comp(['c', a[1] + e, ...a.slice(d + e)]))
+      }
+      return f
+    }
+    a[0] = 'a'
+    return a
+  }
+  
   let buffer = [], i = 0, l, length = len(past), match, p = [], patch = [], pos, q = 0
   while (i < length) {
     match = matches(tree, past.slice(i), i)
@@ -132,19 +177,23 @@ function bcdiff (past, next) {
       l = len(buffer)
       m = []
       while ((j = patch.indexOf(buffer[0], j + 1)) != -1) {
-        if (patch.slice(j, j + l).toString() == buffer.toString()) m.push(j)
+        if (j != i + 2 && patch.slice(j, j + l).toString() == buffer.toString()) m.push(j)
       }
       k = -1, l = -1
-      for (j of m) {
-        h = j - 2
-        if (patch[h] > l || i == j && patch[h] == l) {
-          l = patch[h]
-          if (h != i) {
-            k = j
-            if (i in as) {
-              as[i].push([k, patch[i + 1]])
-            } else {
-              as[i] = [[k, patch[i + 1]]]
+      if (len(m) == 0) {
+        patch[i] = 'c'
+      } else {
+        for (j of m) {
+          h = j - 2
+          if (patch[h] > l || i == j && patch[h] == l) {
+            l = patch[h]
+            if (h != i) {
+              k = j
+              if (i in as) {
+                as[i].push([k, patch[i + 1]])
+              } else {
+                as[i] = [[k, patch[i + 1]]]
+              }
             }
           }
         }
@@ -156,13 +205,13 @@ function bcdiff (past, next) {
     }
   }
   let a, b, c, d, e
-  let cs = {}, bs = {}
+  let bs = {}, cs = {}
   i = 0, j = 0, length = len(patch), p = []
   while (i < length) {
     cs[i] = j + 1
     h = i
-    l = j
-    while (h-- > 0 && !(h in cs)) cs[h] = l--
+    k = j
+    while (h-- > 0 && !(h in cs)) cs[h] = k--
     e = falsee
     if (i in as) {
       c = -1, d = falsee
@@ -174,18 +223,23 @@ function bcdiff (past, next) {
         }
       }
       if (d) {
-        buffer = ['b', ...d]
         bs[i] = d[0]
+        buffer = ['b', ...d]
         e = truee
         i += len(patch.slice(i, i + 2 + patch[i + 1]))
       }
     }
     if (!e) {
-      if (patch[i] == 'a') {
+      h = patch[i]
+      if (h == 'a') {
         buffer = patch.slice(i, i + 2 + patch[i + 1])
         buffer[1] += j + 2
+      } else if (h == 'c') {
+        buffer = patch.slice(i, i + 2 + patch[i + 1])
+        buffer[1] += j + 2
+        buffer = comp(buffer)
       } else {
-        buffer = [a = patch[i], a + patch[i + 1]]
+        buffer = [a = h, a + patch[i + 1]]
       }
       i += len(buffer)
     }
@@ -193,8 +247,8 @@ function bcdiff (past, next) {
     p.push(...buffer)
   }
   for (b in bs) {
-    p[cs[b]] = cs[bs[b] - 2]
-    p[cs[b] + 1] += cs[bs[b] - 2]
+    p[a = cs[b]] = c = cs[bs[b] - 2]
+    p[a + 1] += c
   }
   return p
 }
@@ -212,9 +266,9 @@ function bcpatch (last, p) {
     } else if (a == 'b') {
       return p.slice(p[i++], p[i++])
     } else if (a == 'c') {
-      a = p.slice(p[i++], p[i++])
-      b = len(a)
-      return Array(p[i++]).fill().map((i, c) => a[c % b])
+      a = p[i++]
+      b = p.slice(i, i = a)
+      return Array(p[i++]).fill().map((i, c) => b[c % a])
     } else if (a == 'd') {
       a = p.slice(p[i++], p[i++])
       b = len(a)
